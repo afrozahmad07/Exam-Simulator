@@ -6,6 +6,9 @@ from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 import openai
 
+# Import database models
+from models import User, Document, Question, Exam, ExamQuestion, get_engine, get_session
+
 # Load environment variables
 load_dotenv()
 
@@ -15,9 +18,13 @@ app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-pro
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 app.config['ALLOWED_EXTENSIONS'] = {'pdf', 'docx', 'txt'}
+app.config['DATABASE_URL'] = os.getenv('DATABASE_URL', 'sqlite:///exam_simulator.db')
 
 # Initialize OpenAI
 openai.api_key = os.getenv('OPENAI_API_KEY')
+
+# Initialize database
+db_engine = get_engine(app.config['DATABASE_URL'])
 
 # Initialize Flask-Login
 login_manager = LoginManager()
@@ -37,8 +44,14 @@ def allowed_file(filename):
 @login_manager.user_loader
 def load_user(user_id):
     """Load user for Flask-Login"""
-    # TODO: Implement user loading from database
-    return None
+    db_session = get_session(db_engine)
+    try:
+        user = db_session.query(User).get(int(user_id))
+        return user
+    except:
+        return None
+    finally:
+        db_session.close()
 
 
 @app.route('/')
@@ -50,20 +63,79 @@ def index():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     """User login"""
-    if request.method == 'POST':
-        # TODO: Implement login logic
-        flash('Login functionality to be implemented', 'info')
+    if current_user.is_authenticated:
         return redirect(url_for('index'))
+
+    if request.method == 'POST':
+        email = request.form.get('email')
+        password = request.form.get('password')
+
+        if not email or not password:
+            flash('Please provide both email and password', 'error')
+            return redirect(url_for('login'))
+
+        db_session = get_session(db_engine)
+        try:
+            user = db_session.query(User).filter_by(email=email).first()
+
+            if user and user.check_password(password):
+                login_user(user)
+                flash(f'Welcome back, {user.name}!', 'success')
+                next_page = request.args.get('next')
+                return redirect(next_page) if next_page else redirect(url_for('index'))
+            else:
+                flash('Invalid email or password', 'error')
+        finally:
+            db_session.close()
+
     return render_template('login.html')
 
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     """User registration"""
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+
     if request.method == 'POST':
-        # TODO: Implement registration logic
-        flash('Registration functionality to be implemented', 'info')
-        return redirect(url_for('login'))
+        email = request.form.get('email')
+        password = request.form.get('password')
+        name = request.form.get('name')
+        organization = request.form.get('organization', '')
+        role = request.form.get('role', 'student')
+
+        if not email or not password or not name:
+            flash('Please provide email, password, and name', 'error')
+            return redirect(url_for('register'))
+
+        db_session = get_session(db_engine)
+        try:
+            # Check if user already exists
+            existing_user = db_session.query(User).filter_by(email=email).first()
+            if existing_user:
+                flash('Email already registered. Please login.', 'error')
+                return redirect(url_for('login'))
+
+            # Create new user
+            new_user = User(
+                email=email,
+                name=name,
+                organization=organization,
+                role=role
+            )
+            new_user.set_password(password)
+
+            db_session.add(new_user)
+            db_session.commit()
+
+            flash('Registration successful! Please login.', 'success')
+            return redirect(url_for('login'))
+        except Exception as e:
+            db_session.rollback()
+            flash(f'Registration failed: {str(e)}', 'error')
+        finally:
+            db_session.close()
+
     return render_template('register.html')
 
 

@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+
+{% block title %}Register - Exam Simulator{% endblock %}
+
+{% block main_class %}{% endblock %}
+
+{% block content %}
+<div class="register-page d-flex align-items-center min-vh-100 bg-light">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-7 col-lg-6">
+                <div class="card shadow-lg border-0 rounded-lg">
+                    <div class="card-header bg-primary text-white text-center py-4">
+                        <h3 class="mb-0">
+                            <i class="bi bi-person-plus-fill me-2"></i>
+                            Create Account
+                        </h3>
+                        <p class="mb-0 mt-2 small">Join Exam Simulator today</p>
+                    </div>
+                    <div class="card-body p-4">
+                        <form method="POST" action="{{ url_for('register') }}" x-data="{ loading: false, showPassword: false }" @submit="loading = true">
+                            <div class="row">
+                                <!-- Full Name -->
+                                <div class="col-md-12 mb-3">
+                                    <label for="name" class="form-label">
+                                        <i class="bi bi-person me-1"></i>Full Name
+                                    </label>
+                                    <input type="text"
+                                           class="form-control"
+                                           id="name"
+                                           name="name"
+                                           placeholder="John Doe"
+                                           required
+                                           autofocus>
+                                </div>
+
+                                <!-- Email -->
+                                <div class="col-md-12 mb-3">
+                                    <label for="email" class="form-label">
+                                        <i class="bi bi-envelope me-1"></i>Email Address
+                                    </label>
+                                    <input type="email"
+                                           class="form-control"
+                                           id="email"
+                                           name="email"
+                                           placeholder="your.email@example.com"
+                                           required>
+                                </div>
+
+                                <!-- Organization -->
+                                <div class="col-md-12 mb-3">
+                                    <label for="organization" class="form-label">
+                                        <i class="bi bi-building me-1"></i>Organization
+                                        <small class="text-muted">(Optional)</small>
+                                    </label>
+                                    <input type="text"
+                                           class="form-control"
+                                           id="organization"
+                                           name="organization"
+                                           placeholder="Your University or Company">
+                                </div>
+
+                                <!-- Role -->
+                                <div class="col-md-12 mb-3">
+                                    <label for="role" class="form-label">
+                                        <i class="bi bi-briefcase me-1"></i>Role
+                                    </label>
+                                    <select class="form-select" id="role" name="role" required>
+                                        <option value="student" selected>Student</option>
+                                        <option value="teacher">Teacher</option>
+                                        <option value="admin">Administrator</option>
+                                    </select>
+                                </div>
+
+                                <!-- Password -->
+                                <div class="col-md-6 mb-3">
+                                    <label for="password" class="form-label">
+                                        <i class="bi bi-lock me-1"></i>Password
+                                    </label>
+                                    <div class="input-group">
+                                        <input :type="showPassword ? 'text' : 'password'"
+                                               class="form-control"
+                                               id="password"
+                                               name="password"
+                                               placeholder="Create password"
+                                               minlength="6"
+                                               required>
+                                        <button class="btn btn-outline-secondary"
+                                                type="button"
+                                                @click="showPassword = !showPassword">
+                                            <i class="bi" :class="showPassword ? 'bi-eye-slash' : 'bi-eye'"></i>
+                                        </button>
+                                    </div>
+                                    <small class="form-text text-muted">Minimum 6 characters</small>
+                                </div>
+
+                                <!-- Confirm Password -->
+                                <div class="col-md-6 mb-3">
+                                    <label for="confirm_password" class="form-label">
+                                        <i class="bi bi-lock-fill me-1"></i>Confirm Password
+                                    </label>
+                                    <input :type="showPassword ? 'text' : 'password'"
+                                           class="form-control"
+                                           id="confirm_password"
+                                           name="confirm_password"
+                                           placeholder="Confirm password"
+                                           minlength="6"
+                                           required>
+                                </div>
+                            </div>
+
+                            <!-- Terms and Conditions -->
+                            <div class="mb-3 form-check">
+                                <input type="checkbox" class="form-check-input" id="terms" required>
+                                <label class="form-check-label small" for="terms">
+                                    I agree to the <a href="#" class="text-decoration-none">Terms and Conditions</a>
+                                </label>
+                            </div>
+
+                            <!-- Submit Button -->
+                            <div class="d-grid">
+                                <button type="submit"
+                                        class="btn btn-primary btn-lg"
+                                        :disabled="loading">
+                                    <span x-show="!loading">
+                                        <i class="bi bi-person-plus me-2"></i>Create Account
+                                    </span>
+                                    <span x-show="loading">
+                                        <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                        Creating account...
+                                    </span>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="card-footer text-center py-3 bg-light">
+                        <small class="text-muted">
+                            Already have an account?
+                            <a href="{{ url_for('login') }}" class="text-decoration-none fw-bold">Sign in here</a>
+                        </small>
+                    </div>
+                </div>
+
+                <!-- Security Notice -->
+                <div class="alert alert-success mt-3 border-0" role="alert">
+                    <i class="bi bi-shield-check me-2"></i>
+                    <small>Your data is secure and encrypted. We respect your privacy.</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+// Password confirmation validation
+document.addEventListener('alpine:init', () => {
+    const form = document.querySelector('form');
+    if (form) {
+        form.addEventListener('submit', (e) => {
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirm_password').value;
+
+            if (password !== confirmPassword) {
+                e.preventDefault();
+                alert('Passwords do not match!');
+                return false;
+            }
+        });
+    }
+});
+</script>
+{% endblock %}
+{% endblock %}
