@@ -1,0 +1,381 @@
+{% extends "base.html" %}
+
+{% block title %}Review Questions - Exam Simulator{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('documents') }}">Documents</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('generate_questions', document_id=document.id) }}">Generate</a></li>
+                    <li class="breadcrumb-item active">Review Questions</li>
+                </ol>
+            </nav>
+            <h1 class="h2 mb-3">
+                <i class="bi bi-clipboard-check me-2 text-success"></i>Review Generated Questions
+            </h1>
+            <p class="text-muted">Review, edit, and approve questions before saving to your question bank</p>
+        </div>
+    </div>
+
+    <!-- Document Info -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="alert alert-info">
+                <i class="bi bi-file-earmark-text me-2"></i>
+                <strong>Document:</strong> {{ document.filename }}
+            </div>
+        </div>
+    </div>
+
+    <form method="POST" action="{{ url_for('save_questions') }}" x-data="reviewQuestions()">
+
+        <!-- Action Bar (Sticky) -->
+        <div class="sticky-top bg-white shadow-sm border-bottom mb-4 py-3" style="top: 0; z-index: 100;">
+            <div class="container">
+                <div class="row align-items-center">
+                    <div class="col-md-6">
+                        <h5 class="mb-0">
+                            <span class="badge bg-primary me-2" x-text="selectedCount"></span>
+                            <span x-text="selectedCount === 1 ? 'Question Selected' : 'Questions Selected'"></span>
+                        </h5>
+                    </div>
+                    <div class="col-md-6 text-end">
+                        <button type="button" class="btn btn-sm btn-outline-primary me-2" @click="selectAll()">
+                            <i class="bi bi-check-all me-1"></i>Select All
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary me-2" @click="deselectAll()">
+                            <i class="bi bi-x me-1"></i>Deselect All
+                        </button>
+                        <button type="submit" class="btn btn-success" :disabled="selectedCount === 0">
+                            <i class="bi bi-save me-2"></i>
+                            Save <span x-text="selectedCount"></span> Approved
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Multiple Choice Questions -->
+        {% if questions.mcq %}
+        <div class="row mb-5">
+            <div class="col-md-12">
+                <h3 class="mb-4">
+                    <i class="bi bi-list-check me-2 text-primary"></i>
+                    Multiple Choice Questions ({{ questions.mcq|length }})
+                </h3>
+
+                {% for q in questions.mcq %}
+                <div class="card mb-4 shadow-sm" x-data="{ approved: true, editing: false }">
+                    <div class="card-header" :class="approved ? 'bg-light' : 'bg-danger bg-opacity-10'">
+                        <div class="row align-items-center">
+                            <div class="col-md-8">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox"
+                                           name="approved" value="mcq_{{ loop.index0 }}"
+                                           id="mcq_{{ loop.index0 }}_approved"
+                                           x-model="approved" @change="updateCount()">
+                                    <label class="form-check-label fw-bold" for="mcq_{{ loop.index0 }}_approved">
+                                        Question {{ loop.index }}
+                                        <span x-show="approved" class="badge bg-success ms-2">Approved</span>
+                                        <span x-show="!approved" class="badge bg-danger ms-2">Rejected</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-4 text-end">
+                                <button type="button" class="btn btn-sm btn-outline-primary"
+                                        @click="editing = !editing">
+                                    <i class="bi" :class="editing ? 'bi-eye-slash' : 'bi-pencil'"></i>
+                                    <span x-text="editing ? 'Cancel Edit' : 'Edit'"></span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <!-- View Mode -->
+                        <div x-show="!editing">
+                            <h5 class="mb-3">{{ q.question }}</h5>
+                            <div class="row mb-3">
+                                {% for key, value in q.options.items() %}
+                                <div class="col-md-6 mb-2">
+                                    <div class="alert {{ 'alert-success' if key == q.correct_answer else 'alert-secondary' }} mb-0 py-2">
+                                        <strong>{{ key }}.</strong> {{ value }}
+                                        {% if key == q.correct_answer %}
+                                        <i class="bi bi-check-circle-fill text-success float-end"></i>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% if q.explanation %}
+                            <div class="alert alert-info mb-0">
+                                <strong><i class="bi bi-lightbulb me-2"></i>Explanation:</strong>
+                                {{ q.explanation }}
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Edit Mode -->
+                        <div x-show="editing">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Question Text:</label>
+                                <textarea class="form-control" name="mcq_{{ loop.index0 }}_question"
+                                          rows="2">{{ q.question }}</textarea>
+                            </div>
+                            <div class="row">
+                                {% for key, value in q.options.items() %}
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold">Option {{ key }}:</label>
+                                    <input type="text" class="form-control"
+                                           name="mcq_{{ loop.index0 }}_option_{{ key }}"
+                                           value="{{ value }}">
+                                </div>
+                                {% endfor %}
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Correct Answer:</label>
+                                <select class="form-select" name="mcq_{{ loop.index0 }}_correct">
+                                    {% for key in ['A', 'B', 'C', 'D'] %}
+                                    <option value="{{ key }}" {{ 'selected' if key == q.correct_answer else '' }}>
+                                        {{ key }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Explanation:</label>
+                                <textarea class="form-control" name="mcq_{{ loop.index0 }}_explanation"
+                                          rows="2">{{ q.explanation }}</textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- True/False Questions -->
+        {% if questions.true_false %}
+        <div class="row mb-5">
+            <div class="col-md-12">
+                <h3 class="mb-4">
+                    <i class="bi bi-check2-circle me-2 text-success"></i>
+                    True/False Questions ({{ questions.true_false|length }})
+                </h3>
+
+                {% for q in questions.true_false %}
+                <div class="card mb-4 shadow-sm" x-data="{ approved: true, editing: false }">
+                    <div class="card-header" :class="approved ? 'bg-light' : 'bg-danger bg-opacity-10'">
+                        <div class="row align-items-center">
+                            <div class="col-md-8">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox"
+                                           name="approved" value="tf_{{ loop.index0 }}"
+                                           id="tf_{{ loop.index0 }}_approved"
+                                           x-model="approved" @change="updateCount()">
+                                    <label class="form-check-label fw-bold" for="tf_{{ loop.index0 }}_approved">
+                                        Question {{ loop.index }}
+                                        <span x-show="approved" class="badge bg-success ms-2">Approved</span>
+                                        <span x-show="!approved" class="badge bg-danger ms-2">Rejected</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-4 text-end">
+                                <button type="button" class="btn btn-sm btn-outline-primary"
+                                        @click="editing = !editing">
+                                    <i class="bi" :class="editing ? 'bi-eye-slash' : 'bi-pencil'"></i>
+                                    <span x-text="editing ? 'Cancel Edit' : 'Edit'"></span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <!-- View Mode -->
+                        <div x-show="!editing">
+                            <h5 class="mb-3">{{ q.question }}</h5>
+                            <div class="alert alert-success mb-3">
+                                <strong><i class="bi bi-check-circle-fill me-2"></i>Correct Answer:</strong>
+                                {{ 'TRUE' if q.correct_answer else 'FALSE' }}
+                            </div>
+                            {% if q.explanation %}
+                            <div class="alert alert-info mb-0">
+                                <strong><i class="bi bi-lightbulb me-2"></i>Explanation:</strong>
+                                {{ q.explanation }}
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Edit Mode -->
+                        <div x-show="editing">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Statement:</label>
+                                <textarea class="form-control" name="tf_{{ loop.index0 }}_question"
+                                          rows="2">{{ q.question }}</textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Correct Answer:</label>
+                                <select class="form-select" name="tf_{{ loop.index0 }}_correct">
+                                    <option value="true" {{ 'selected' if q.correct_answer else '' }}>TRUE</option>
+                                    <option value="false" {{ 'selected' if not q.correct_answer else '' }}>FALSE</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Explanation:</label>
+                                <textarea class="form-control" name="tf_{{ loop.index0 }}_explanation"
+                                          rows="2">{{ q.explanation }}</textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Short Answer Questions -->
+        {% if questions.short_answer %}
+        <div class="row mb-5">
+            <div class="col-md-12">
+                <h3 class="mb-4">
+                    <i class="bi bi-pencil-square me-2 text-info"></i>
+                    Short Answer Questions ({{ questions.short_answer|length }})
+                </h3>
+
+                {% for q in questions.short_answer %}
+                <div class="card mb-4 shadow-sm" x-data="{ approved: true, editing: false }">
+                    <div class="card-header" :class="approved ? 'bg-light' : 'bg-danger bg-opacity-10'">
+                        <div class="row align-items-center">
+                            <div class="col-md-8">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox"
+                                           name="approved" value="sa_{{ loop.index0 }}"
+                                           id="sa_{{ loop.index0 }}_approved"
+                                           x-model="approved" @change="updateCount()">
+                                    <label class="form-check-label fw-bold" for="sa_{{ loop.index0 }}_approved">
+                                        Question {{ loop.index }}
+                                        <span x-show="approved" class="badge bg-success ms-2">Approved</span>
+                                        <span x-show="!approved" class="badge bg-danger ms-2">Rejected</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-4 text-end">
+                                <button type="button" class="btn btn-sm btn-outline-primary"
+                                        @click="editing = !editing">
+                                    <i class="bi" :class="editing ? 'bi-eye-slash' : 'bi-pencil'"></i>
+                                    <span x-text="editing ? 'Cancel Edit' : 'Edit'"></span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <!-- View Mode -->
+                        <div x-show="!editing">
+                            <h5 class="mb-3">{{ q.question }}</h5>
+                            <div class="alert alert-success mb-3">
+                                <strong><i class="bi bi-check-circle me-2"></i>Model Answer:</strong>
+                                <p class="mb-0 mt-2">{{ q.model_answer }}</p>
+                            </div>
+                            {% if q.key_points %}
+                            <div class="alert alert-info mb-0">
+                                <strong><i class="bi bi-list-ul me-2"></i>Key Points:</strong>
+                                <ul class="mb-0 mt-2">
+                                    {% for point in q.key_points %}
+                                    <li>{{ point }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Edit Mode -->
+                        <div x-show="editing">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Question:</label>
+                                <textarea class="form-control" name="sa_{{ loop.index0 }}_question"
+                                          rows="2">{{ q.question }}</textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Model Answer:</label>
+                                <textarea class="form-control" name="sa_{{ loop.index0 }}_model_answer"
+                                          rows="3">{{ q.model_answer }}</textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Key Points (one per line):</label>
+                                <textarea class="form-control" name="sa_{{ loop.index0 }}_key_points"
+                                          rows="4">{{ q.key_points|join('\n') }}</textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Bottom Action Bar -->
+        <div class="row mb-5">
+            <div class="col-md-12">
+                <div class="card bg-light">
+                    <div class="card-body">
+                        <div class="row align-items-center">
+                            <div class="col-md-6">
+                                <h5 class="mb-0">
+                                    <span class="badge bg-primary me-2" x-text="selectedCount"></span>
+                                    <span x-text="selectedCount === 1 ? 'Question Selected' : 'Questions Selected'"></span>
+                                </h5>
+                            </div>
+                            <div class="col-md-6 text-end">
+                                <a href="{{ url_for('generate_questions', document_id=document.id) }}"
+                                   class="btn btn-outline-secondary me-2">
+                                    <i class="bi bi-arrow-left me-2"></i>Back
+                                </a>
+                                <button type="submit" class="btn btn-success btn-lg" :disabled="selectedCount === 0">
+                                    <i class="bi bi-save me-2"></i>
+                                    Save <span x-text="selectedCount"></span> Approved Questions
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function reviewQuestions() {
+    return {
+        selectedCount: {{ (questions.mcq|length + questions.true_false|length + questions.short_answer|length) }},
+
+        updateCount() {
+            this.$nextTick(() => {
+                this.selectedCount = document.querySelectorAll('input[name="approved"]:checked').length;
+            });
+        },
+
+        selectAll() {
+            document.querySelectorAll('input[name="approved"]').forEach(cb => {
+                cb.checked = true;
+                cb.dispatchEvent(new Event('change'));
+            });
+            this.updateCount();
+        },
+
+        deselectAll() {
+            document.querySelectorAll('input[name="approved"]').forEach(cb => {
+                cb.checked = false;
+                cb.dispatchEvent(new Event('change'));
+            });
+            this.updateCount();
+        }
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+
+{% block title %}Upload CSV Questions - Exam Simulator{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="display-6 mb-2">
+                <i class="bi bi-file-earmark-spreadsheet text-primary me-2"></i>
+                Upload MCQ Questions from CSV
+            </h1>
+            <p class="text-muted">Import multiple choice questions in bulk using a CSV file</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <!-- Upload Form -->
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-upload me-2"></i>
+                        Upload CSV File
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" enctype="multipart/form-data">
+                        <!-- Info Alert -->
+                        <div class="alert alert-info mb-3">
+                            <i class="bi bi-info-circle me-2"></i>
+                            <strong>Note:</strong> Questions from CSV files will be automatically stored under a virtual document called "CSV Import" in your question bank.
+                        </div>
+
+                        <!-- CSV File Upload -->
+                        <div class="mb-3">
+                            <label for="csv_file" class="form-label">
+                                <i class="bi bi-file-earmark-arrow-up me-2"></i>
+                                CSV File
+                            </label>
+                            <input type="file" class="form-control" id="csv_file" name="csv_file"
+                                   accept=".csv" required>
+                            <div class="form-text">
+                                Upload a CSV file with MCQ questions (max 16MB)
+                            </div>
+                        </div>
+
+                        <!-- Submit Button -->
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="bi bi-upload me-2"></i>
+                                Upload and Import Questions
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <!-- Instructions Card -->
+            <div class="card border-0 shadow-sm mb-3">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-info-circle me-2"></i>
+                        Instructions
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <h6>CSV Format Requirements:</h6>
+                    <ul class="small mb-3">
+                        <li>File must have a header row</li>
+                        <li>Required columns:
+                            <ul>
+                                <li><code>question</code></li>
+                                <li><code>option_a</code></li>
+                                <li><code>option_b</code></li>
+                                <li><code>option_c</code></li>
+                                <li><code>option_d</code></li>
+                                <li><code>correct_answer</code> (A, B, C, or D)</li>
+                                <li><code>explanation</code></li>
+                                <li><code>difficulty</code> (easy, medium, or hard)</li>
+                            </ul>
+                        </li>
+                        <li>All fields are required</li>
+                        <li>Use UTF-8 encoding</li>
+                    </ul>
+
+                    <h6 class="mt-3">Sample CSV:</h6>
+                    <a href="{{ url_for('download_sample_csv') }}" class="btn btn-success btn-sm w-100">
+                        <i class="bi bi-download me-2"></i>
+                        Download Sample Template
+                    </a>
+                </div>
+            </div>
+
+            <!-- Tips Card -->
+            <div class="card border-0 bg-light">
+                <div class="card-body">
+                    <h6 class="card-title">
+                        <i class="bi bi-lightbulb me-2"></i>
+                        Tips
+                    </h6>
+                    <ul class="small text-muted mb-0">
+                        <li>Download the sample template to see the exact format</li>
+                        <li>Duplicate questions will be rejected</li>
+                        <li>Questions are automatically validated</li>
+                        <li>Empty or invalid rows will be skipped</li>
+                        <li>You'll see a detailed report after upload</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Back Button -->
+    <div class="text-center mt-4">
+        <a href="{{ url_for('question_bank') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-2"></i>
+            Back to Question Bank
+        </a>
+    </div>
+</div>
+
+<style>
+    code {
+        background-color: #f8f9fa;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 0.9em;
+    }
+</style>
+{% endblock %}

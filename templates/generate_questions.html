@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+
+{% block title %}Generate Questions - Exam Simulator{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('documents') }}">Documents</a></li>
+                    <li class="breadcrumb-item active">Generate Questions</li>
+                </ol>
+            </nav>
+            <h1 class="h2 mb-3">
+                <i class="bi bi-magic me-2 text-primary"></i>Generate Questions
+            </h1>
+            <p class="text-muted">Use AI to generate questions from your document</p>
+        </div>
+    </div>
+
+    <!-- Document Info Card -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card border-primary">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-file-earmark-text me-2"></i>{{ document.filename }}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <p class="mb-1"><strong>Uploaded:</strong></p>
+                            <p class="text-muted">{{ document.created_at.strftime('%B %d, %Y') }}</p>
+                        </div>
+                        <div class="col-md-4">
+                            <p class="mb-1"><strong>Content Length:</strong></p>
+                            <p class="text-muted">{{ "{:,}".format(document.content|length) }} characters</p>
+                        </div>
+                        <div class="col-md-4">
+                            <p class="mb-1"><strong>Word Count:</strong></p>
+                            <p class="text-muted">~{{ "{:,}".format((document.content.split()|length)) }} words</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Question Generation Form -->
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card shadow-sm">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">
+                        <i class="bi bi-sliders me-2"></i>Question Settings
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" id="generateForm" x-data="questionGenerator()">
+
+                        <!-- Quick Selection Buttons -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Quick Select:</label>
+                            <div class="btn-group w-100" role="group">
+                                <button type="button" class="btn btn-outline-primary" @click="setQuickConfig(10, 0, 0)">
+                                    10 MCQs
+                                </button>
+                                <button type="button" class="btn btn-outline-primary" @click="setQuickConfig(20, 0, 0)">
+                                    20 MCQs
+                                </button>
+                                <button type="button" class="btn btn-outline-primary" @click="setQuickConfig(50, 0, 0)">
+                                    50 MCQs
+                                </button>
+                                <button type="button" class="btn btn-outline-success" @click="setQuickConfig(7, 5, 3)">
+                                    Mixed (15)
+                                </button>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <!-- Multiple Choice Questions -->
+                        <div class="mb-4">
+                            <label for="num_mcq" class="form-label fw-bold">
+                                <i class="bi bi-list-check me-2 text-primary"></i>Multiple Choice Questions
+                            </label>
+                            <input type="range" class="form-range" id="num_mcq" name="num_mcq"
+                                   min="0" max="20" x-model="mcq" @input="updateTotal()">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <small class="text-muted">Slide to select quantity</small>
+                                <span class="badge bg-primary fs-6" x-text="mcq + ' questions'"></span>
+                            </div>
+                        </div>
+
+                        <!-- True/False Questions -->
+                        <div class="mb-4">
+                            <label for="num_true_false" class="form-label fw-bold">
+                                <i class="bi bi-check2-circle me-2 text-success"></i>True/False Questions
+                            </label>
+                            <input type="range" class="form-range" id="num_true_false" name="num_true_false"
+                                   min="0" max="20" x-model="trueFalse" @input="updateTotal()">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <small class="text-muted">Slide to select quantity</small>
+                                <span class="badge bg-success fs-6" x-text="trueFalse + ' questions'"></span>
+                            </div>
+                        </div>
+
+                        <!-- Short Answer Questions -->
+                        <div class="mb-4">
+                            <label for="num_short_answer" class="form-label fw-bold">
+                                <i class="bi bi-pencil-square me-2 text-info"></i>Short Answer Questions
+                            </label>
+                            <input type="range" class="form-range" id="num_short_answer" name="num_short_answer"
+                                   min="0" max="20" x-model="shortAnswer" @input="updateTotal()">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <small class="text-muted">Slide to select quantity</small>
+                                <span class="badge bg-info fs-6" x-text="shortAnswer + ' questions'"></span>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <!-- Total Count -->
+                        <div class="alert alert-info mb-4">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <i class="bi bi-info-circle me-2"></i>
+                                    <strong>Total Questions to Generate:</strong>
+                                </div>
+                                <span class="badge bg-dark fs-5" x-text="total"></span>
+                            </div>
+                        </div>
+
+                        <!-- Info Box -->
+                        <div class="alert alert-warning" role="alert">
+                            <i class="bi bi-exclamation-triangle me-2"></i>
+                            <strong>Note:</strong> Question generation uses AI and may take 30-60 seconds.
+                            Maximum 50 questions can be generated at once to ensure quality.
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg"
+                                    :disabled="total === 0" x-bind:class="{ 'disabled': total === 0 }">
+                                <i class="bi bi-magic me-2"></i>
+                                <span x-show="total > 0">Generate <span x-text="total"></span> Questions</span>
+                                <span x-show="total === 0">Select Questions to Generate</span>
+                            </button>
+                            <a href="{{ url_for('documents') }}" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left me-2"></i>Back to Documents
+                            </a>
+                        </div>
+
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Information Section -->
+    <div class="row mt-5">
+        <div class="col-lg-8 mx-auto">
+            <div class="card bg-light">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="bi bi-lightbulb me-2 text-warning"></i>Tips for Better Questions
+                    </h5>
+                    <ul class="mb-0">
+                        <li><strong>Multiple Choice:</strong> Best for testing knowledge recall and understanding</li>
+                        <li><strong>True/False:</strong> Great for quick assessments and fact checking</li>
+                        <li><strong>Short Answer:</strong> Ideal for testing deeper understanding and application</li>
+                        <li>Questions will be generated based on your document content</li>
+                        <li>You'll have a chance to review and edit before saving</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function questionGenerator() {
+    return {
+        mcq: 5,
+        trueFalse: 0,
+        shortAnswer: 0,
+        total: 5,
+
+        updateTotal() {
+            this.total = parseInt(this.mcq) + parseInt(this.trueFalse) + parseInt(this.shortAnswer);
+        },
+
+        setQuickConfig(mcq, tf, sa) {
+            this.mcq = mcq;
+            this.trueFalse = tf;
+            this.shortAnswer = sa;
+            this.updateTotal();
+        }
+    }
+}
+</script>
+{% endblock %}

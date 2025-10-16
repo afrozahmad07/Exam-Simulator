@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}403 Forbidden - Exam Simulator{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-6 text-center py-5">
+            <i class="bi bi-shield-x text-danger" style="font-size: 6rem;"></i>
+            <h1 class="display-1 mt-4">403</h1>
+            <h2 class="mb-4">Forbidden</h2>
+            <p class="lead text-muted mb-4">
+                You don't have permission to access this page.
+            </p>
+            <a href="{{ url_for('index') }}" class="btn btn-primary btn-lg">
+                <i class="bi bi-house-fill me-2"></i>Go to Home
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

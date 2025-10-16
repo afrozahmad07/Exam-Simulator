@@ -1,0 +1,608 @@
+{% extends "base.html" %}
+
+{% block title %}Taking Exam - Exam Simulator{% endblock %}
+
+{% block extra_css %}
+<style>
+    .exam-container {
+        max-width: 900px;
+        margin: 0 auto;
+    }
+
+    .timer-box {
+        position: sticky;
+        top: 20px;
+        z-index: 100;
+    }
+
+    .question-nav {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+        gap: 8px;
+    }
+
+    .question-nav-btn {
+        width: 40px;
+        height: 40px;
+        border: 2px solid #dee2e6;
+        background: white;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: 600;
+        transition: all 0.2s;
+    }
+
+    .question-nav-btn:hover {
+        border-color: #0d6efd;
+        background: #e7f1ff;
+    }
+
+    .question-nav-btn.answered {
+        background: #d1e7dd;
+        border-color: #198754;
+        color: #198754;
+    }
+
+    .question-nav-btn.current {
+        background: #0d6efd;
+        border-color: #0d6efd;
+        color: white;
+    }
+
+    .question-card {
+        display: none;
+    }
+
+    .question-card.active {
+        display: block;
+    }
+
+    .option-label {
+        cursor: pointer;
+        padding: 15px;
+        border: 2px solid #dee2e6;
+        border-radius: 8px;
+        transition: all 0.2s;
+        display: block;
+        margin-bottom: 10px;
+    }
+
+    .option-label:hover {
+        border-color: #0d6efd;
+        background: #f8f9fa;
+    }
+
+    .option-label input[type="radio"]:checked + .option-content {
+        font-weight: 600;
+    }
+
+    .option-label input[type="radio"]:checked ~ * {
+        color: #0d6efd;
+    }
+
+    input[type="radio"]:checked + .option-content {
+        color: #0d6efd;
+    }
+
+    .timer-warning {
+        animation: pulse 1s infinite;
+    }
+
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="exam-container py-4">
+    <div class="row">
+        <!-- Main Content -->
+        <div class="col-lg-8">
+            <!-- Exam Header -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h4 class="mb-1">
+                                <i class="bi bi-pencil-square text-primary me-2"></i>
+                                Exam in Progress
+                            </h4>
+                            <p class="text-muted mb-0">
+                                <span id="current-question-display">Question 1</span> of {{ total_questions }}
+                            </p>
+                        </div>
+                        <div class="text-end">
+                            <div class="mb-1 small text-muted">Time Remaining</div>
+                            <div id="timer" class="fs-4 fw-bold text-primary">
+                                <i class="bi bi-clock me-2"></i>
+                                <span id="timer-display">{{ duration }}:00</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Questions -->
+            <div id="questions-container">
+                {% for question in questions %}
+                <div class="question-card {% if loop.index == 1 %}active{% endif %}"
+                     id="question-{{ loop.index }}"
+                     data-question-id="{{ question.id }}"
+                     data-question-number="{{ loop.index }}">
+                    <div class="card border-0 shadow-sm mb-4">
+                        <div class="card-body p-4">
+                            <div class="mb-3">
+                                <span class="badge bg-secondary">Question {{ loop.index }}</span>
+                                <span class="badge bg-info ms-2">{{ question.difficulty|title }}</span>
+                                <span class="badge bg-primary ms-2">{{ question.question_type|replace('_', ' ')|title }}</span>
+                            </div>
+
+                            <h5 class="mb-4">{{ question.question_text }}</h5>
+
+                            {% if question.question_type == 'mcq' %}
+                                <!-- Multiple Choice Options -->
+                                <div class="options-container">
+                                    {% for option_key, option_value in question.options_json.items() %}
+                                    <label class="option-label">
+                                        <input type="radio"
+                                               name="question_{{ question.id }}"
+                                               value="{{ option_key }}"
+                                               class="me-3"
+                                               data-question-id="{{ question.id }}"
+                                               {% if user_answers.get(question.id|string) == option_key %}checked{% endif %}>
+                                        <span class="option-content">
+                                            <strong>{{ option_key }}.</strong> {{ option_value }}
+                                        </span>
+                                    </label>
+                                    {% endfor %}
+                                </div>
+                            {% elif question.question_type == 'true_false' %}
+                                <!-- True/False Options -->
+                                <div class="options-container">
+                                    <label class="option-label">
+                                        <input type="radio"
+                                               name="question_{{ question.id }}"
+                                               value="true"
+                                               class="me-3"
+                                               data-question-id="{{ question.id }}"
+                                               {% if user_answers.get(question.id|string) == 'true' %}checked{% endif %}>
+                                        <span class="option-content">
+                                            <i class="bi bi-check-circle text-success me-2"></i>
+                                            <strong>True</strong>
+                                        </span>
+                                    </label>
+                                    <label class="option-label">
+                                        <input type="radio"
+                                               name="question_{{ question.id }}"
+                                               value="false"
+                                               class="me-3"
+                                               data-question-id="{{ question.id }}"
+                                               {% if user_answers.get(question.id|string) == 'false' %}checked{% endif %}>
+                                        <span class="option-content">
+                                            <i class="bi bi-x-circle text-danger me-2"></i>
+                                            <strong>False</strong>
+                                        </span>
+                                    </label>
+                                </div>
+                            {% elif question.question_type == 'short_answer' %}
+                                <!-- Short Answer Input -->
+                                <div class="short-answer-container">
+                                    <textarea class="form-control short-answer-input"
+                                              id="answer_{{ question.id }}"
+                                              name="question_{{ question.id }}"
+                                              data-question-id="{{ question.id }}"
+                                              rows="5"
+                                              placeholder="Type your answer here..."
+                                              style="border: 2px solid #dee2e6; border-radius: 8px; padding: 15px;">{{ user_answers.get(question.id|string, '') }}</textarea>
+                                    <div class="mt-2 small text-muted">
+                                        <i class="bi bi-pencil me-1"></i>
+                                        Write a detailed answer to the question above
+                                    </div>
+                                </div>
+                            {% endif %}
+
+                            <div class="mt-3 small text-muted">
+                                <i class="bi bi-info-circle me-1"></i>
+                                Your answer is automatically saved
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Navigation Buttons -->
+                    <div class="d-flex justify-content-between mb-4">
+                        <button class="btn btn-outline-secondary prev-btn"
+                                onclick="navigateQuestion(-1)"
+                                {% if loop.index == 1 %}disabled{% endif %}>
+                            <i class="bi bi-arrow-left me-2"></i>Previous
+                        </button>
+
+                        {% if loop.index == total_questions %}
+                        <button class="btn btn-success" onclick="confirmSubmit()">
+                            <i class="bi bi-check-circle me-2"></i>Submit Exam
+                        </button>
+                        {% else %}
+                        <button class="btn btn-primary next-btn" onclick="navigateQuestion(1)">
+                            Next<i class="bi bi-arrow-right ms-2"></i>
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <div class="timer-box">
+                <!-- Question Navigator -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h6 class="mb-0">
+                            <i class="bi bi-grid-3x3-gap-fill me-2"></i>
+                            Question Navigator
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="question-nav" id="question-navigator">
+                            {% for question in questions %}
+                            <button class="question-nav-btn {% if loop.index == 1 %}current{% endif %}"
+                                    id="nav-btn-{{ loop.index }}"
+                                    onclick="jumpToQuestion({{ loop.index }})"
+                                    title="Question {{ loop.index }}">
+                                {{ loop.index }}
+                            </button>
+                            {% endfor %}
+                        </div>
+                        <div class="mt-3">
+                            <div class="d-flex align-items-center mb-2">
+                                <div class="question-nav-btn current" style="width: 30px; height: 30px; font-size: 12px; margin-right: 10px;">1</div>
+                                <small>Current</small>
+                            </div>
+                            <div class="d-flex align-items-center mb-2">
+                                <div class="question-nav-btn answered" style="width: 30px; height: 30px; font-size: 12px; margin-right: 10px;">2</div>
+                                <small>Answered</small>
+                            </div>
+                            <div class="d-flex align-items-center">
+                                <div class="question-nav-btn" style="width: 30px; height: 30px; font-size: 12px; margin-right: 10px;">3</div>
+                                <small>Not Answered</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Progress Card -->
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body">
+                        <h6 class="mb-3">
+                            <i class="bi bi-bar-chart-fill me-2"></i>
+                            Progress
+                        </h6>
+                        <div class="mb-2">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="small">Answered</span>
+                                <span class="small fw-bold" id="answered-count">0 / {{ total_questions }}</span>
+                            </div>
+                            <div class="progress" style="height: 10px;">
+                                <div class="progress-bar bg-success"
+                                     id="progress-bar"
+                                     role="progressbar"
+                                     style="width: 0%">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Submit Button (Fixed) -->
+                <div class="card border-0 shadow-sm mt-4">
+                    <div class="card-body">
+                        <button class="btn btn-success w-100 btn-lg" onclick="confirmSubmit()">
+                            <i class="bi bi-check-circle me-2"></i>
+                            Submit Exam
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Submit Confirmation Modal -->
+<div class="modal fade" id="submitModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-exclamation-triangle text-warning me-2"></i>
+                    Submit Exam?
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-2">You have answered <strong id="modal-answered-count">0</strong> out of <strong>{{ total_questions }}</strong> questions.</p>
+                <p class="mb-0">Are you sure you want to submit your exam? You cannot change your answers after submission.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-arrow-left me-2"></i>Continue Exam
+                </button>
+                <form method="POST" action="{{ url_for('submit_exam') }}" style="display: inline;">
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-check-circle me-2"></i>Submit Exam
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Exam configuration
+    const startTime = new Date("{{ start_time }}");
+    const duration = {{ duration }}; // in minutes
+    const totalQuestions = {{ total_questions }};
+    let currentQuestion = 1;
+    let answeredQuestions = new Set();
+    let questionStartTimes = {}; // Track when each question was first viewed
+    let questionTotalTimes = {}; // Track total time spent on each question
+
+    // Initialize answered questions and times from server
+    {% for qid, answer in user_answers.items() %}
+    answeredQuestions.add({{ qid }});
+    {% endfor %}
+
+    // Initialize question times from server (for browser refresh)
+    {% for qid, time in question_times.items() %}
+    questionTotalTimes[{{ qid }}] = {{ time }};
+    {% endfor %}
+
+    // Timer functionality
+    let timerInterval;
+
+    function updateTimer() {
+        const now = new Date();
+        const elapsed = Math.floor((now - startTime) / 1000); // seconds elapsed
+        const totalSeconds = duration * 60; // total exam duration in seconds
+        const remainingSeconds = Math.max(0, totalSeconds - elapsed);
+
+        const minutes = Math.floor(remainingSeconds / 60);
+        const seconds = remainingSeconds % 60;
+
+        const timerDisplay = document.getElementById('timer-display');
+        const timerElement = document.getElementById('timer');
+
+        timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+
+        // Warning at 5 minutes
+        if (remainingSeconds <= 300 && remainingSeconds > 60) {
+            timerElement.classList.add('text-warning');
+            timerElement.classList.remove('text-primary', 'text-danger');
+        } else if (remainingSeconds <= 60) {
+            timerElement.classList.add('text-danger', 'timer-warning');
+            timerElement.classList.remove('text-primary', 'text-warning');
+        }
+
+        // Auto-submit when time is up
+        if (remainingSeconds === 0) {
+            clearInterval(timerInterval);
+            alert('Time is up! Your exam will be submitted automatically.');
+            document.querySelector('form[action="{{ url_for('submit_exam') }}"]').submit();
+        }
+    }
+
+    // Start timer
+    timerInterval = setInterval(updateTimer, 1000);
+    updateTimer();
+
+    // Question navigation
+    function navigateQuestion(direction) {
+        const newQuestion = currentQuestion + direction;
+        if (newQuestion >= 1 && newQuestion <= totalQuestions) {
+            showQuestion(newQuestion);
+        }
+    }
+
+    function jumpToQuestion(questionNumber) {
+        showQuestion(questionNumber);
+    }
+
+    function showQuestion(questionNumber) {
+        // Save time for current question before switching
+        const currentCard = document.querySelector('.question-card.active');
+        if (currentCard) {
+            const currentQuestionId = currentCard.dataset.questionId;
+            stopQuestionTimer(currentQuestionId);
+        }
+
+        // Hide all questions
+        document.querySelectorAll('.question-card').forEach(card => {
+            card.classList.remove('active');
+        });
+
+        // Show target question
+        const targetCard = document.querySelector(`[data-question-number="${questionNumber}"]`);
+        if (targetCard) {
+            targetCard.classList.add('active');
+            currentQuestion = questionNumber;
+
+            // Start timer for new question
+            const newQuestionId = targetCard.dataset.questionId;
+            startQuestionTimer(newQuestionId);
+
+            // Update current question display
+            document.getElementById('current-question-display').textContent = `Question ${questionNumber}`;
+
+            // Update navigator buttons
+            document.querySelectorAll('.question-nav-btn').forEach(btn => {
+                btn.classList.remove('current');
+            });
+            document.getElementById(`nav-btn-${questionNumber}`).classList.add('current');
+
+            // Scroll to top
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    }
+
+    // Time tracking functions
+    function startQuestionTimer(questionId) {
+        if (!questionStartTimes[questionId]) {
+            questionStartTimes[questionId] = Date.now();
+        }
+    }
+
+    function stopQuestionTimer(questionId) {
+        if (questionStartTimes[questionId]) {
+            const elapsed = Math.floor((Date.now() - questionStartTimes[questionId]) / 1000);
+            questionTotalTimes[questionId] = (questionTotalTimes[questionId] || 0) + elapsed;
+            delete questionStartTimes[questionId];
+        }
+    }
+
+    function getQuestionTime(questionId) {
+        let totalTime = questionTotalTimes[questionId] || 0;
+        if (questionStartTimes[questionId]) {
+            const elapsed = Math.floor((Date.now() - questionStartTimes[questionId]) / 1000);
+            totalTime += elapsed;
+        }
+        return totalTime;
+    }
+
+    // Auto-save answer with time tracking
+    function saveAnswer(questionId, answer) {
+        const timeSpent = getQuestionTime(questionId);
+
+        fetch("{{ url_for('save_answer') }}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                question_id: questionId,
+                answer: answer,
+                time_spent: timeSpent
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Mark question as answered
+                answeredQuestions.add(parseInt(questionId));
+                updateProgress();
+
+                // Update navigator button
+                const questionNumber = document.querySelector(`[data-question-id="${questionId}"]`).closest('.question-card').dataset.questionNumber;
+                const navBtn = document.getElementById(`nav-btn-${questionNumber}`);
+                if (navBtn) {
+                    navBtn.classList.add('answered');
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error saving answer:', error);
+        });
+    }
+
+    // Listen to answer changes
+    document.addEventListener('DOMContentLoaded', function() {
+        // Handle radio button changes (MCQ and True/False)
+        document.querySelectorAll('input[type="radio"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                const questionId = this.dataset.questionId;
+                const answer = this.value;
+                saveAnswer(questionId, answer);
+            });
+        });
+
+        // Handle textarea changes (Short Answer) with debouncing
+        let textareaTimeout;
+        document.querySelectorAll('textarea.short-answer-input').forEach(textarea => {
+            textarea.addEventListener('input', function() {
+                const questionId = this.dataset.questionId;
+                const answer = this.value;
+
+                // Debounce: wait 1 second after user stops typing
+                clearTimeout(textareaTimeout);
+                textareaTimeout = setTimeout(() => {
+                    saveAnswer(questionId, answer);
+                }, 1000);
+            });
+
+            // Also save on blur (when user clicks away)
+            textarea.addEventListener('blur', function() {
+                const questionId = this.dataset.questionId;
+                const answer = this.value;
+                if (answer.trim()) {
+                    saveAnswer(questionId, answer);
+                }
+            });
+        });
+
+        // Initialize navigator state
+        updateProgress();
+        updateNavigatorState();
+
+        // Start timer for first question
+        const firstQuestion = document.querySelector('.question-card.active');
+        if (firstQuestion) {
+            const firstQuestionId = firstQuestion.dataset.questionId;
+            startQuestionTimer(firstQuestionId);
+        }
+
+        // Save time before page unload
+        window.addEventListener('beforeunload', function() {
+            const currentCard = document.querySelector('.question-card.active');
+            if (currentCard) {
+                const currentQuestionId = currentCard.dataset.questionId;
+                stopQuestionTimer(currentQuestionId);
+            }
+        });
+    });
+
+    function updateNavigatorState() {
+        document.querySelectorAll('.question-card').forEach(card => {
+            const questionId = card.dataset.questionId;
+            const questionNumber = card.dataset.questionNumber;
+
+            // Check for radio button answers (MCQ and True/False)
+            const hasRadioAnswer = card.querySelector('input[type="radio"]:checked');
+
+            // Check for textarea answers (Short Answer)
+            const textarea = card.querySelector('textarea.short-answer-input');
+            const hasTextAnswer = textarea && textarea.value.trim().length > 0;
+
+            if (hasRadioAnswer || hasTextAnswer) {
+                answeredQuestions.add(parseInt(questionId));
+                const navBtn = document.getElementById(`nav-btn-${questionNumber}`);
+                if (navBtn) {
+                    navBtn.classList.add('answered');
+                }
+            }
+        });
+    }
+
+    function updateProgress() {
+        const answeredCount = answeredQuestions.size;
+        const percentage = (answeredCount / totalQuestions) * 100;
+
+        document.getElementById('answered-count').textContent = `${answeredCount} / ${totalQuestions}`;
+        document.getElementById('progress-bar').style.width = `${percentage}%`;
+    }
+
+    function confirmSubmit() {
+        document.getElementById('modal-answered-count').textContent = answeredQuestions.size;
+        const submitModal = new bootstrap.Modal(document.getElementById('submitModal'));
+        submitModal.show();
+    }
+
+    // Warn before leaving page
+    window.addEventListener('beforeunload', function(e) {
+        e.preventDefault();
+        e.returnValue = '';
+        return '';
+    });
+</script>
+{% endblock %}

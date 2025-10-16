@@ -18,6 +18,12 @@ class User(Base, UserMixin):
     name = Column(String(255), nullable=False)
     organization = Column(String(255), nullable=True)
     role = Column(String(50), default='student')  # student, teacher, admin
+    remember_token = Column(String(255), nullable=True)  # For remember me functionality
+
+    # AI Settings (for teachers and admins)
+    ai_provider = Column(String(50), default='gemini')  # 'openai' or 'gemini'
+    ai_model = Column(String(100), default='gemini-2.5-flash')  # Specific model name
+
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     # Relationships
@@ -61,16 +67,22 @@ class Question(Base):
 
     id = Column(Integer, primary_key=True)
     question_text = Column(Text, nullable=False)
-    options_json = Column(JSON, nullable=False)  # Store as JSON: {"A": "...", "B": "...", "C": "...", "D": "..."}
-    correct_answer = Column(String(10), nullable=False)  # A, B, C, or D
+    question_type = Column(String(20), default='mcq')  # mcq, true_false, short_answer
+    options_json = Column(JSON, nullable=True)  # Store as JSON: {"A": "...", "B": "...", "C": "...", "D": "..."} for MCQ
+    correct_answer = Column(String(10), nullable=True)  # A, B, C, D for MCQ, "true"/"false" for T/F
+    model_answer = Column(Text, nullable=True)  # For short answer questions
+    key_points = Column(JSON, nullable=True)  # Array of key points for short answer
     explanation = Column(Text, nullable=True)
     document_id = Column(Integer, ForeignKey('documents.id'), nullable=False)
     difficulty = Column(String(20), default='medium')  # easy, medium, hard
+    status = Column(String(20), default='pending')  # pending, approved, rejected
+    created_by = Column(Integer, ForeignKey('users.id'), nullable=True)  # User who created/approved it
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     # Relationships
     document = relationship('Document', back_populates='questions')
     exam_questions = relationship('ExamQuestion', back_populates='question', cascade='all, delete-orphan')
+    creator = relationship('User', foreign_keys=[created_by])
 
     def __repr__(self):
         return f'<Question {self.id}: {self.question_text[:50]}...>'

@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+
+{% block title %}Document Management - Admin{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="display-5 mb-2">
+                        <i class="bi bi-file-earmark-text-fill text-success"></i> Document Management
+                    </h1>
+                    <p class="lead text-muted">View all uploaded documents across the system</p>
+                </div>
+                <div>
+                    <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline-primary">
+                        <i class="bi bi-arrow-left me-2"></i>Back to Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Documents Table -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <i class="bi bi-table me-2"></i>All Documents ({{ documents|length }})
+                </div>
+                <div class="card-body">
+                    {% if documents %}
+                        <div class="table-responsive">
+                            <table class="table table-hover table-striped">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Filename</th>
+                                        <th>Uploader</th>
+                                        <th>Organization</th>
+                                        <th>Questions</th>
+                                        <th>Content Size</th>
+                                        <th>Uploaded</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for doc in documents %}
+                                        <tr>
+                                            <td>{{ doc.id }}</td>
+                                            <td>
+                                                <i class="bi bi-file-earmark-{{ 'pdf' if doc.filename.endswith('.pdf') else 'word' if doc.filename.endswith('.docx') else 'text' }}-fill me-1"></i>
+                                                <strong>{{ doc.filename }}</strong>
+                                            </td>
+                                            <td>
+                                                {{ doc.uploader.name }}
+                                                <br>
+                                                <small class="text-muted">{{ doc.uploader.email }}</small>
+                                            </td>
+                                            <td>
+                                                {% if doc.organization %}
+                                                    <span class="badge bg-secondary">{{ doc.organization }}</span>
+                                                {% else %}
+                                                    <span class="text-muted">-</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-primary">{{ doc.question_count }} questions</span>
+                                            </td>
+                                            <td>
+                                                <small class="text-muted">{{ (doc.content|length / 1024)|round(1) }} KB</small>
+                                            </td>
+                                            <td>
+                                                <small class="text-muted">{{ doc.created_at.strftime('%b %d, %Y') }}</small>
+                                                <br>
+                                                <small class="text-muted">{{ doc.created_at.strftime('%I:%M %p') }}</small>
+                                            </td>
+                                            <td>
+                                                <button type="button" class="btn btn-sm btn-outline-info"
+                                                        data-bs-toggle="modal"
+                                                        data-bs-target="#viewModal{{ doc.id }}">
+                                                    <i class="bi bi-eye-fill"></i> View
+                                                </button>
+                                            </td>
+                                        </tr>
+
+                                        <!-- View Document Modal -->
+                                        <div class="modal fade" id="viewModal{{ doc.id }}" tabindex="-1" aria-labelledby="viewModalLabel{{ doc.id }}" aria-hidden="true">
+                                            <div class="modal-dialog modal-lg">
+                                                <div class="modal-content">
+                                                    <div class="modal-header bg-info text-white">
+                                                        <h5 class="modal-title" id="viewModalLabel{{ doc.id }}">
+                                                            <i class="bi bi-file-earmark-text-fill me-2"></i>{{ doc.filename }}
+                                                        </h5>
+                                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                    </div>
+                                                    <div class="modal-body">
+                                                        <div class="mb-3">
+                                                            <h6>Document Information:</h6>
+                                                            <ul class="list-unstyled">
+                                                                <li><strong>Uploader:</strong> {{ doc.uploader.name }} ({{ doc.uploader.email }})</li>
+                                                                <li><strong>Organization:</strong> {{ doc.organization or 'N/A' }}</li>
+                                                                <li><strong>Uploaded:</strong> {{ doc.created_at.strftime('%B %d, %Y at %I:%M %p') }}</li>
+                                                                <li><strong>Questions Generated:</strong> {{ doc.question_count }}</li>
+                                                                <li><strong>Content Size:</strong> {{ (doc.content|length / 1024)|round(1) }} KB</li>
+                                                            </ul>
+                                                        </div>
+                                                        <hr>
+                                                        <h6>Content Preview:</h6>
+                                                        <div class="bg-light p-3 rounded" style="max-height: 400px; overflow-y: auto;">
+                                                            <pre class="mb-0" style="white-space: pre-wrap; word-wrap: break-word;">{{ doc.content[:2000] }}{% if doc.content|length > 2000 %}...
+
+[Content truncated. Full content is {{ (doc.content|length / 1024)|round(1) }} KB]{% endif %}</pre>
+                                                        </div>
+                                                    </div>
+                                                    <div class="modal-footer">
+                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle me-2"></i>No documents have been uploaded yet.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="row mt-4">
+        <div class="col-md-4 mb-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <i class="bi bi-file-earmark-text-fill text-success" style="font-size: 2rem;"></i>
+                    <h3 class="mt-2">{{ documents|length }}</h3>
+                    <p class="text-muted mb-0">Total Documents</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <i class="bi bi-question-circle-fill text-info" style="font-size: 2rem;"></i>
+                    <h3 class="mt-2">{{ documents|sum(attribute='question_count') }}</h3>
+                    <p class="text-muted mb-0">Total Questions</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <i class="bi bi-database-fill text-warning" style="font-size: 2rem;"></i>
+                    <h3 class="mt-2">{{ (documents|sum(attribute='content')|length / 1024 / 1024)|round(1) }} MB</h3>
+                    <p class="text-muted mb-0">Total Content</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- File Type Breakdown -->
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-light">
+                    <i class="bi bi-pie-chart-fill me-2"></i>Document Types
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        {% set pdf_count = documents|selectattr('filename', 'match', '.*\.pdf$')|list|length %}
+                        {% set docx_count = documents|selectattr('filename', 'match', '.*\.docx$')|list|length %}
+                        {% set txt_count = documents|selectattr('filename', 'match', '.*\.txt$')|list|length %}
+
+                        <div class="col-md-4">
+                            <i class="bi bi-file-earmark-pdf-fill text-danger" style="font-size: 2rem;"></i>
+                            <h4 class="mt-2">{{ pdf_count }}</h4>
+                            <p class="text-muted">PDF Files</p>
+                        </div>
+                        <div class="col-md-4">
+                            <i class="bi bi-file-earmark-word-fill text-primary" style="font-size: 2rem;"></i>
+                            <h4 class="mt-2">{{ docx_count }}</h4>
+                            <p class="text-muted">DOCX Files</p>
+                        </div>
+                        <div class="col-md-4">
+                            <i class="bi bi-file-earmark-text-fill text-secondary" style="font-size: 2rem;"></i>
+                            <h4 class="mt-2">{{ txt_count }}</h4>
+                            <p class="text-muted">TXT Files</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

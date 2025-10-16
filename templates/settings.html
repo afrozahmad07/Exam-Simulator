@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+
+{% block title %}AI Model Settings - Exam Simulator{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <!-- Header -->
+            <div class="mb-4">
+                <h1><i class="bi bi-gear-fill me-2"></i>AI Model Settings</h1>
+                <p class="text-muted">Configure which AI provider and model to use for generating questions</p>
+            </div>
+
+            <!-- Current Settings Card -->
+            <div class="card mb-4 border-primary">
+                <div class="card-header bg-primary text-white">
+                    <i class="bi bi-info-circle me-2"></i>Current Settings
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <strong>AI Provider:</strong>
+                            <p class="mb-0">
+                                {% if current_user.ai_provider == 'gemini' %}
+                                    <span class="badge bg-success">Google Gemini</span>
+                                {% elif current_user.ai_provider == 'openai' %}
+                                    <span class="badge bg-info">OpenAI</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Not Set</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="col-md-6">
+                            <strong>AI Model:</strong>
+                            <p class="mb-0">
+                                <code>{{ current_user.ai_model or 'gemini-2.5-flash' }}</code>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings Form -->
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-sliders me-2"></i>Update AI Settings</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" x-data="settingsForm()">
+                        <!-- AI Provider Selection -->
+                        <div class="mb-4">
+                            <label for="ai_provider" class="form-label fw-bold">
+                                <i class="bi bi-building me-1"></i>AI Provider
+                            </label>
+                            <select name="ai_provider" id="ai_provider" class="form-select form-select-lg"
+                                    x-model="provider" @change="updateModels()" required>
+                                <option value="">-- Select AI Provider --</option>
+                                <option value="gemini" {% if current_user.ai_provider == 'gemini' %}selected{% endif %}>
+                                    Google Gemini (Recommended)
+                                </option>
+                                <option value="openai" {% if current_user.ai_provider == 'openai' %}selected{% endif %}>
+                                    OpenAI
+                                </option>
+                            </select>
+                            <div class="form-text">
+                                <i class="bi bi-lightbulb me-1"></i>
+                                <strong>Gemini</strong> is the default and recommended provider (cost-effective and fast)
+                            </div>
+                        </div>
+
+                        <!-- AI Model Selection -->
+                        <div class="mb-4">
+                            <label for="ai_model" class="form-label fw-bold">
+                                <i class="bi bi-cpu me-1"></i>AI Model
+                            </label>
+                            <select name="ai_model" id="ai_model" class="form-select form-select-lg" required>
+                                <option value="">-- Select AI Model --</option>
+
+                                <!-- Gemini Models -->
+                                <optgroup label="Google Gemini" x-show="provider === 'gemini'">
+                                    {% for model_id, model_name in ai_models.gemini.items() %}
+                                    <option value="{{ model_id }}"
+                                            data-provider="gemini"
+                                            {% if current_user.ai_model == model_id %}selected{% endif %}>
+                                        {{ model_name }}
+                                    </option>
+                                    {% endfor %}
+                                </optgroup>
+
+                                <!-- OpenAI Models -->
+                                <optgroup label="OpenAI" x-show="provider === 'openai'">
+                                    {% for model_id, model_name in ai_models.openai.items() %}
+                                    <option value="{{ model_id }}"
+                                            data-provider="openai"
+                                            {% if current_user.ai_model == model_id %}selected{% endif %}>
+                                        {{ model_name }}
+                                    </option>
+                                    {% endfor %}
+                                </optgroup>
+                            </select>
+                            <div class="form-text">
+                                <i class="bi bi-info-circle me-1"></i>
+                                Different models offer different capabilities and speeds
+                            </div>
+                        </div>
+
+                        <!-- Model Descriptions -->
+                        <div class="alert alert-info mb-4" x-show="provider === 'gemini'">
+                            <h6 class="alert-heading"><i class="bi bi-google me-2"></i>About Gemini Models</h6>
+                            <ul class="mb-0 small">
+                                <li><strong>gemini-2.5-flash</strong> (Default): Fast, cost-effective, latest model - best for most use cases</li>
+                                <li><strong>gemini-2.5-pro</strong>: Most capable model with advanced features</li>
+                            </ul>
+                        </div>
+
+                        <div class="alert alert-info mb-4" x-show="provider === 'openai'" style="display: none;">
+                            <h6 class="alert-heading"><i class="bi bi-openai me-2"></i>About OpenAI Models</h6>
+                            <ul class="mb-0 small">
+                                <li><strong>gpt-4o-mini</strong>: Fast and economical, good for most tasks</li>
+                                <li><strong>gpt-4.1-mini</strong>: Latest model with improved capabilities</li>
+                            </ul>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="bi bi-check-circle me-2"></i>Save Settings
+                            </button>
+                            <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left me-2"></i>Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Help Section -->
+            <div class="card mt-4 border-secondary">
+                <div class="card-header bg-light">
+                    <h6 class="mb-0"><i class="bi bi-question-circle me-2"></i>Need Help?</h6>
+                </div>
+                <div class="card-body small">
+                    <h6>How to get API Keys:</h6>
+                    <ul>
+                        <li>
+                            <strong>Gemini:</strong> Get your free API key at
+                            <a href="https://aistudio.google.com/apikey" target="_blank">Google AI Studio</a>
+                        </li>
+                        <li>
+                            <strong>OpenAI:</strong> Get your API key at
+                            <a href="https://platform.openai.com/api-keys" target="_blank">OpenAI Platform</a>
+                        </li>
+                    </ul>
+                    <p class="mb-0 text-muted">
+                        <i class="bi bi-shield-check me-1"></i>
+                        API keys are configured by your system administrator in the <code>.env</code> file
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Alpine.js for dynamic form behavior -->
+<script>
+function settingsForm() {
+    return {
+        provider: '{{ current_user.ai_provider or "gemini" }}',
+
+        updateModels() {
+            // Filter model options based on selected provider
+            const modelSelect = document.getElementById('ai_model');
+            const options = modelSelect.querySelectorAll('option');
+
+            options.forEach(option => {
+                if (option.value === '') {
+                    option.style.display = 'block';
+                    return;
+                }
+
+                const dataProvider = option.getAttribute('data-provider');
+                if (dataProvider === this.provider || !dataProvider) {
+                    option.style.display = 'block';
+                } else {
+                    option.style.display = 'none';
+                }
+            });
+
+            // Reset model selection if it doesn't match the provider
+            const currentModel = modelSelect.value;
+            const currentOption = modelSelect.querySelector(`option[value="${currentModel}"]`);
+            if (currentOption && currentOption.getAttribute('data-provider') !== this.provider) {
+                modelSelect.value = '';
+            }
+        },
+
+        init() {
+            this.updateModels();
+        }
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,254 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard - Exam Simulator{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <h1 class="display-5 mb-3">
+                <i class="bi bi-speedometer2 text-primary"></i> Admin Dashboard
+            </h1>
+            <p class="lead text-muted">Manage users, documents, and system settings</p>
+        </div>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="row mb-4">
+        <div class="col-md-3 mb-3">
+            <div class="card border-primary">
+                <div class="card-body text-center">
+                    <i class="bi bi-people-fill text-primary" style="font-size: 3rem;"></i>
+                    <h3 class="mt-3 mb-0">{{ total_users }}</h3>
+                    <p class="text-muted mb-0">Total Users</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card border-success">
+                <div class="card-body text-center">
+                    <i class="bi bi-file-earmark-text-fill text-success" style="font-size: 3rem;"></i>
+                    <h3 class="mt-3 mb-0">{{ total_documents }}</h3>
+                    <p class="text-muted mb-0">Documents</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card border-info">
+                <div class="card-body text-center">
+                    <i class="bi bi-question-circle-fill text-info" style="font-size: 3rem;"></i>
+                    <h3 class="mt-3 mb-0">{{ total_questions }}</h3>
+                    <p class="text-muted mb-0">Questions</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card border-warning">
+                <div class="card-body text-center">
+                    <i class="bi bi-clipboard-check-fill text-warning" style="font-size: 3rem;"></i>
+                    <h3 class="mt-3 mb-0">{{ total_exams }}</h3>
+                    <p class="text-muted mb-0">Exams Taken</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- User Role Statistics -->
+    <div class="row mb-4">
+        <div class="col-md-4 mb-3">
+            <div class="card h-100">
+                <div class="card-header bg-danger text-white">
+                    <i class="bi bi-shield-fill-check me-2"></i>Administrators
+                </div>
+                <div class="card-body text-center">
+                    <h2 class="mb-0">{{ admin_count }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="card h-100">
+                <div class="card-header bg-info text-white">
+                    <i class="bi bi-person-badge-fill me-2"></i>Teachers
+                </div>
+                <div class="card-body text-center">
+                    <h2 class="mb-0">{{ teacher_count }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="card h-100">
+                <div class="card-header bg-success text-white">
+                    <i class="bi bi-mortarboard-fill me-2"></i>Students
+                </div>
+                <div class="card-body text-center">
+                    <h2 class="mb-0">{{ student_count }}</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Management Cards -->
+    <div class="row mb-4">
+        <div class="col-md-6 mb-3">
+            <div class="card h-100">
+                <div class="card-header bg-primary text-white">
+                    <i class="bi bi-people-fill me-2"></i>User Management
+                </div>
+                <div class="card-body">
+                    <p class="card-text">View and manage all users, change roles, and monitor activity.</p>
+                    <a href="{{ url_for('admin_users') }}" class="btn btn-primary">
+                        <i class="bi bi-arrow-right-circle me-2"></i>Manage Users
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 mb-3">
+            <div class="card h-100">
+                <div class="card-header bg-success text-white">
+                    <i class="bi bi-file-earmark-text-fill me-2"></i>Document Management
+                </div>
+                <div class="card-body">
+                    <p class="card-text">View all uploaded documents and their associated questions.</p>
+                    <a href="{{ url_for('admin_documents') }}" class="btn btn-success">
+                        <i class="bi bi-arrow-right-circle me-2"></i>Manage Documents
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Organizations Card -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-secondary text-white">
+                    <i class="bi bi-building me-2"></i>Organizations
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        <strong>{{ organization_count }}</strong> unique organizations in the system
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="row mb-4">
+        <div class="col-md-6 mb-3">
+            <div class="card h-100">
+                <div class="card-header bg-light">
+                    <i class="bi bi-clock-history me-2"></i>Recent Users
+                </div>
+                <div class="card-body">
+                    {% if recent_users %}
+                        <div class="list-group list-group-flush">
+                            {% for user in recent_users %}
+                                <div class="list-group-item px-0">
+                                    <div class="d-flex w-100 justify-content-between align-items-center">
+                                        <div>
+                                            <strong>{{ user.name }}</strong>
+                                            <br>
+                                            <small class="text-muted">{{ user.email }}</small>
+                                        </div>
+                                        <span class="badge bg-{{ 'danger' if user.role == 'admin' else 'info' if user.role == 'teacher' else 'success' }}">
+                                            {{ user.role }}
+                                        </span>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-muted">No recent users</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 mb-3">
+            <div class="card h-100">
+                <div class="card-header bg-light">
+                    <i class="bi bi-file-earmark-arrow-up me-2"></i>Recent Documents
+                </div>
+                <div class="card-body">
+                    {% if recent_documents %}
+                        <div class="list-group list-group-flush">
+                            {% for doc in recent_documents %}
+                                <div class="list-group-item px-0">
+                                    <div class="d-flex w-100 justify-content-between align-items-center">
+                                        <div>
+                                            <strong>{{ doc.filename }}</strong>
+                                            <br>
+                                            <small class="text-muted">by {{ doc.uploader.name }}</small>
+                                        </div>
+                                        <small class="text-muted">{{ doc.created_at.strftime('%b %d') }}</small>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-muted">No recent documents</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Actions -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card border-warning">
+                <div class="card-header bg-warning">
+                    <i class="bi bi-tools me-2"></i>Admin Actions
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <h5><i class="bi bi-database-fill-add me-2"></i>Create Demo Organizations</h5>
+                            <p class="text-muted">Add sample users and organizations for testing purposes.</p>
+                            <form method="POST" action="{{ url_for('admin_create_demo_orgs') }}">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-plus-circle me-2"></i>Create Demo Data
+                                </button>
+                            </form>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <h5 class="text-danger"><i class="bi bi-exclamation-triangle-fill me-2"></i>Reset Database</h5>
+                            <p class="text-muted">Delete all data except your admin account. This action cannot be undone!</p>
+                            <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#resetModal">
+                                <i class="bi bi-trash-fill me-2"></i>Reset Database
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Reset Database Modal -->
+<div class="modal fade" id="resetModal" tabindex="-1" aria-labelledby="resetModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="resetModalLabel">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>Confirm Database Reset
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="{{ url_for('admin_reset_database') }}">
+                <div class="modal-body">
+                    <div class="alert alert-danger">
+                        <strong>Warning!</strong> This will delete all users (except you), documents, questions, and exams. This action cannot be undone!
+                    </div>
+                    <p>Type <strong>RESET</strong> to confirm:</p>
+                    <input type="text" name="confirm" class="form-control" required placeholder="Type RESET to confirm">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger">Reset Database</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

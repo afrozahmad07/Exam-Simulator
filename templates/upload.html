@@ -24,7 +24,8 @@
                     </h5>
 
                     <form method="POST" action="{{ url_for('upload') }}" enctype="multipart/form-data"
-                          x-data="{ fileName: '', uploading: false }">
+                          x-data="{ fileName: '', fileSize: '', uploading: false }"
+                          @submit="uploading = true">
 
                         <div class="mb-4">
                             <label for="file" class="form-label fw-bold">
@@ -37,15 +38,17 @@
                                    name="file"
                                    accept=".pdf,.docx,.txt"
                                    required
-                                   @change="fileName = $event.target.files[0]?.name || ''">
+                                   @change="fileName = $event.target.files[0]?.name || ''; fileSize = ($event.target.files[0]?.size / 1024 / 1024).toFixed(2) + ' MB'">
                             <div class="form-text">
                                 <i class="bi bi-info-circle me-1"></i>
                                 Supported formats: PDF, DOCX, TXT (Max 16MB)
+                                <br>
+                                <small class="text-muted">Large PDFs may take 30-60 seconds to process</small>
                             </div>
                             <div x-show="fileName" class="mt-2">
                                 <small class="text-success">
                                     <i class="bi bi-check-circle me-1"></i>
-                                    Selected: <strong x-text="fileName"></strong>
+                                    Selected: <strong x-text="fileName"></strong> (<span x-text="fileSize"></span>)
                                 </small>
                             </div>
                         </div>
@@ -53,17 +56,24 @@
                         <div class="d-grid">
                             <button type="submit"
                                     class="btn btn-primary btn-lg"
-                                    :disabled="uploading || !fileName"
-                                    @click="uploading = true">
+                                    :disabled="uploading || !fileName">
                                 <span x-show="!uploading">
                                     <i class="bi bi-cloud-upload me-2"></i>
                                     Upload Document
                                 </span>
                                 <span x-show="uploading">
                                     <span class="spinner-border spinner-border-sm me-2"></span>
-                                    Uploading...
+                                    Processing... Please wait
                                 </span>
                             </button>
+                        </div>
+
+                        <!-- Processing notice -->
+                        <div x-show="uploading" class="alert alert-info mt-3">
+                            <i class="bi bi-hourglass-split me-2"></i>
+                            <strong>Processing your document...</strong>
+                            <br>
+                            <small>This may take up to a minute for large files. Please don't close this page.</small>
                         </div>
                     </form>
                 </div>

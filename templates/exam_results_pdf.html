@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Exam Results - {{ user.name }}</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 2cm;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 12pt;
+            color: #333;
+            line-height: 1.6;
+        }
+        .header {
+            text-align: center;
+            border-bottom: 3px solid #0d6efd;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            color: #0d6efd;
+            margin: 0;
+            font-size: 28pt;
+        }
+        .header p {
+            color: #666;
+            margin: 5px 0;
+        }
+        .stats-grid {
+            display: table;
+            width: 100%;
+            margin: 30px 0;
+        }
+        .stat-item {
+            display: table-cell;
+            text-align: center;
+            padding: 15px;
+            border: 1px solid #ddd;
+            background: #f8f9fa;
+        }
+        .stat-label {
+            font-size: 10pt;
+            color: #666;
+            display: block;
+            margin-bottom: 5px;
+        }
+        .stat-value {
+            font-size: 24pt;
+            font-weight: bold;
+            color: #0d6efd;
+        }
+        .stat-value.success {
+            color: #198754;
+        }
+        .stat-value.danger {
+            color: #dc3545;
+        }
+        .section {
+            margin: 30px 0;
+            page-break-inside: avoid;
+        }
+        .section-title {
+            background: #0d6efd;
+            color: white;
+            padding: 10px 15px;
+            font-size: 14pt;
+            margin-bottom: 15px;
+        }
+        .question {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin-bottom: 15px;
+            page-break-inside: avoid;
+        }
+        .question-header {
+            margin-bottom: 10px;
+        }
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            font-size: 9pt;
+            border-radius: 3px;
+            margin-right: 5px;
+        }
+        .badge-success {
+            background: #198754;
+            color: white;
+        }
+        .badge-danger {
+            background: #dc3545;
+            color: white;
+        }
+        .badge-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        .badge-info {
+            background: #0dcaf0;
+            color: black;
+        }
+        .badge-primary {
+            background: #0d6efd;
+            color: white;
+        }
+        .question-text {
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .option {
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 4px;
+        }
+        .option-correct {
+            background: #d1e7dd;
+            border-left: 4px solid #198754;
+        }
+        .option-wrong {
+            background: #f8d7da;
+            border-left: 4px solid #dc3545;
+        }
+        .option-default {
+            background: #f8f9fa;
+        }
+        .explanation {
+            background: #cff4fc;
+            border-left: 4px solid #0dcaf0;
+            padding: 10px;
+            margin-top: 10px;
+        }
+        .time-summary {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        .time-item {
+            margin: 5px 0;
+        }
+        .footer {
+            text-align: center;
+            color: #666;
+            font-size: 9pt;
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <h1>Exam Results</h1>
+        <p><strong>Student:</strong> {{ user.name }} ({{ user.email }})</p>
+        <p><strong>Completed:</strong> {{ exam.completed_at.strftime('%B %d, %Y at %I:%M %p') }}</p>
+    </div>
+
+    <!-- Statistics -->
+    <div class="stats-grid">
+        <div class="stat-item">
+            <span class="stat-label">Score</span>
+            <span class="stat-value {% if exam.score >= 80 %}success{% elif exam.score >= 60 %}{% else %}danger{% endif %}">
+                {{ "%.1f"|format(exam.score) }}%
+            </span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">Correct</span>
+            <span class="stat-value success">{{ correct_count }}</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">Wrong</span>
+            <span class="stat-value danger">{{ wrong_count }}</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">Total Questions</span>
+            <span class="stat-value">{{ exam.total_questions }}</span>
+        </div>
+    </div>
+
+    <!-- Time Summary -->
+    <div class="time-summary">
+        <h3 style="margin-top: 0;">Time Analysis</h3>
+        <div class="time-item">
+            <strong>Total Time:</strong> {{ '%d:%02d'|format(total_time // 60, total_time % 60) }} minutes
+        </div>
+        <div class="time-item">
+            <strong>Average per Question:</strong> {{ '%.1f'|format(avg_time) }} seconds
+        </div>
+    </div>
+
+    <!-- Performance Feedback -->
+    <div class="section">
+        {% if exam.score >= 80 %}
+        <div style="background: #d1e7dd; padding: 15px; border-radius: 4px;">
+            <strong>Excellent!</strong> You demonstrated a strong understanding of the material.
+        </div>
+        {% elif exam.score >= 60 %}
+        <div style="background: #cfe2ff; padding: 15px; border-radius: 4px;">
+            <strong>Good job!</strong> You passed with a decent score. Keep practicing to improve further.
+        </div>
+        {% else %}
+        <div style="background: #fff3cd; padding: 15px; border-radius: 4px;">
+            <strong>Keep learning!</strong> Review the material and try again to improve your score.
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Detailed Results -->
+    <div class="section">
+        <div class="section-title">Question-by-Question Review</div>
+
+        {% for eq in exam_questions %}
+        <div class="question">
+            <div class="question-header">
+                <span class="badge badge-secondary">Question {{ loop.index }}</span>
+                <span class="badge badge-info">{{ eq.question.difficulty|title }}</span>
+                <span class="badge badge-primary">{{ eq.question.question_type|replace('_', ' ')|title }}</span>
+                {% if eq.time_spent %}
+                <span class="badge badge-secondary">Time: {{ '%d:%02d'|format(eq.time_spent // 60, eq.time_spent % 60) }}</span>
+                {% endif %}
+                {% if eq.is_correct %}
+                <span class="badge badge-success">✓ Correct</span>
+                {% else %}
+                <span class="badge badge-danger">✗ Wrong</span>
+                {% endif %}
+            </div>
+
+            <div class="question-text">{{ eq.question.question_text }}</div>
+
+            {% if eq.question.question_type == 'mcq' %}
+                <!-- MCQ Options -->
+                {% for option_key, option_value in eq.question.options_json.items() %}
+                <div class="option {% if option_key == eq.question.correct_answer %}option-correct
+                    {% elif option_key == eq.user_answer and option_key != eq.question.correct_answer %}option-wrong
+                    {% else %}option-default{% endif %}">
+                    <strong>{{ option_key }}.</strong> {{ option_value }}
+                    {% if option_key == eq.question.correct_answer %}
+                        <span class="badge badge-success">Correct Answer</span>
+                    {% endif %}
+                    {% if option_key == eq.user_answer and option_key != eq.question.correct_answer %}
+                        <span class="badge badge-danger">Your Answer</span>
+                    {% endif %}
+                    {% if option_key == eq.user_answer and option_key == eq.question.correct_answer %}
+                        <span class="badge badge-success">Your Answer</span>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            {% elif eq.question.question_type == 'true_false' %}
+                <!-- True/False Options -->
+                <div class="option {% if eq.question.correct_answer|lower == 'true' %}option-correct{% else %}option-default{% endif %}">
+                    <strong>True</strong>
+                    {% if eq.question.correct_answer|lower == 'true' %}
+                        <span class="badge badge-success">Correct Answer</span>
+                    {% endif %}
+                    {% if eq.user_answer|lower == 'true' and eq.user_answer|lower == eq.question.correct_answer|lower %}
+                        <span class="badge badge-success">Your Answer</span>
+                    {% elif eq.user_answer|lower == 'true' and eq.user_answer|lower != eq.question.correct_answer|lower %}
+                        <span class="badge badge-danger">Your Answer</span>
+                    {% endif %}
+                </div>
+                <div class="option {% if eq.question.correct_answer|lower == 'false' %}option-correct{% else %}option-default{% endif %}">
+                    <strong>False</strong>
+                    {% if eq.question.correct_answer|lower == 'false' %}
+                        <span class="badge badge-success">Correct Answer</span>
+                    {% endif %}
+                    {% if eq.user_answer|lower == 'false' and eq.user_answer|lower == eq.question.correct_answer|lower %}
+                        <span class="badge badge-success">Your Answer</span>
+                    {% elif eq.user_answer|lower == 'false' and eq.user_answer|lower != eq.question.correct_answer|lower %}
+                        <span class="badge badge-danger">Your Answer</span>
+                    {% endif %}
+                </div>
+            {% endif %}
+
+            {% if eq.question.explanation %}
+            <div class="explanation">
+                <strong>Explanation:</strong> {{ eq.question.explanation }}
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+        <p>Generated by Exam Simulator</p>
+        <p>This is an official exam results document for {{ user.name }}</p>
+    </div>
+</body>
+</html>

@@ -10,50 +10,147 @@
                 <i class="bi bi-pencil-square text-success me-2"></i>
                 Take Exam
             </h1>
-            <p class="text-muted">Test your knowledge with AI-generated questions</p>
+            <p class="text-muted">Test your knowledge with questions from your uploaded documents</p>
         </div>
     </div>
 
-    <div class="row justify-content-center">
-        <div class="col-lg-10">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body text-center py-5">
-                    <div class="mb-4">
-                        <i class="bi bi-clipboard-data text-primary" style="font-size: 4rem;"></i>
+    {% if documents %}
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="bi bi-clipboard-check me-2"></i>Select Exam Options
+                        </h5>
                     </div>
-                    <h3 class="mb-3">Exam Feature Coming Soon</h3>
-                    <p class="text-muted mb-4">
-                        This feature is under development. Soon you'll be able to:
-                    </p>
-                    <div class="row justify-content-center mb-4">
-                        <div class="col-md-8">
-                            <ul class="list-unstyled text-start">
-                                <li class="mb-2">
-                                    <i class="bi bi-check-circle-fill text-success me-2"></i>
-                                    Select from your uploaded documents
-                                </li>
-                                <li class="mb-2">
-                                    <i class="bi bi-check-circle-fill text-success me-2"></i>
-                                    Choose number of questions and difficulty
-                                </li>
-                                <li class="mb-2">
-                                    <i class="bi bi-check-circle-fill text-success me-2"></i>
-                                    Take timed or untimed exams
-                                </li>
-                                <li class="mb-2">
-                                    <i class="bi bi-check-circle-fill text-success me-2"></i>
-                                    Get instant feedback with explanations
-                                </li>
-                            </ul>
+                    <div class="card-body p-4">
+                        <form method="POST" action="{{ url_for('exam') }}">
+                            <!-- Document Selection -->
+                            <div class="mb-4">
+                                <label for="document_id" class="form-label fw-bold">
+                                    Select Document
+                                    <span class="text-danger">*</span>
+                                </label>
+                                <select name="document_id" id="document_id" class="form-select form-select-lg" required>
+                                    <option value="">-- Choose a document --</option>
+                                    {% for doc in documents %}
+                                        <option value="{{ doc.id }}">
+                                            {{ doc.filename }}
+                                            ({{ doc.question_count }} questions available)
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                                <div class="form-text">
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    Select the document you want to be tested on
+                                </div>
+                            </div>
+
+                            <!-- Number of Questions -->
+                            <div class="mb-4">
+                                <label for="num_questions" class="form-label fw-bold">
+                                    Number of Questions
+                                </label>
+                                <select name="num_questions" id="num_questions" class="form-select">
+                                    <option value="5">5 Questions</option>
+                                    <option value="10" selected>10 Questions</option>
+                                    <option value="15">15 Questions</option>
+                                    <option value="20">20 Questions</option>
+                                    <option value="25">25 Questions</option>
+                                </select>
+                            </div>
+
+                            <!-- Difficulty Level -->
+                            <div class="mb-4">
+                                <label for="difficulty" class="form-label fw-bold">
+                                    Difficulty Level
+                                </label>
+                                <select name="difficulty" id="difficulty" class="form-select">
+                                    <option value="all" selected>All Levels</option>
+                                    <option value="easy">Easy</option>
+                                    <option value="medium">Medium</option>
+                                    <option value="hard">Hard</option>
+                                </select>
+                            </div>
+
+                            <!-- Submit Button -->
+                            <div class="d-grid">
+                                <button type="submit" class="btn btn-success btn-lg">
+                                    <i class="bi bi-play-circle me-2"></i>
+                                    Start Exam
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Documents Info Card -->
+                <div class="card border-0 bg-light mt-4">
+                    <div class="card-body">
+                        <h6 class="card-title mb-3">
+                            <i class="bi bi-lightbulb me-2"></i>
+                            Your Documents
+                        </h6>
+                        <div class="list-group">
+                            {% for doc in documents %}
+                                <div class="list-group-item">
+                                    <div class="d-flex w-100 justify-content-between align-items-center">
+                                        <div>
+                                            <i class="bi bi-file-earmark-{{ 'pdf' if doc.filename.endswith('.pdf') else 'word' if doc.filename.endswith('.docx') else 'text' }}-fill me-2"></i>
+                                            <strong>{{ doc.filename }}</strong>
+                                        </div>
+                                        <span class="badge bg-primary">{{ doc.question_count }} questions</span>
+                                    </div>
+                                    {% if doc.question_count == 0 %}
+                                        <small class="text-warning">
+                                            <i class="bi bi-exclamation-triangle me-1"></i>
+                                            No questions generated yet. Questions will be auto-generated when you start an exam.
+                                        </small>
+                                    {% endif %}
+                                </div>
+                            {% endfor %}
                         </div>
                     </div>
-                    <a href="{{ url_for('upload') }}" class="btn btn-primary">
-                        <i class="bi bi-cloud-upload me-2"></i>
-                        Upload Materials First
-                    </a>
                 </div>
             </div>
         </div>
-    </div>
+    {% else %}
+        <!-- No Documents Uploaded -->
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body text-center py-5">
+                        <div class="mb-4">
+                            <i class="bi bi-inbox text-muted" style="font-size: 5rem;"></i>
+                        </div>
+                        <h3 class="mb-3">No Documents Found</h3>
+                        <p class="text-muted mb-4">
+                            You need to upload study materials before you can take an exam.
+                        </p>
+                        <a href="{{ url_for('upload') }}" class="btn btn-primary btn-lg">
+                            <i class="bi bi-cloud-upload me-2"></i>
+                            Upload Your First Document
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Info Card -->
+                <div class="card border-0 bg-light mt-4">
+                    <div class="card-body">
+                        <h6 class="card-title mb-3">
+                            <i class="bi bi-info-circle me-2"></i>
+                            How It Works
+                        </h6>
+                        <ol class="small text-muted mb-0">
+                            <li class="mb-2">Upload your study materials (PDF, DOCX, or TXT)</li>
+                            <li class="mb-2">AI will analyze your documents</li>
+                            <li class="mb-2">Questions will be generated automatically</li>
+                            <li class="mb-2">Take exams to test your knowledge</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
 </div>
 {% endblock %}

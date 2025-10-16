@@ -1,0 +1,442 @@
+{% extends "base.html" %}
+
+{% block title %}Exam Results - Exam Simulator{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stat-card {
+        transition: transform 0.2s;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+    }
+    .chart-container {
+        position: relative;
+        height: 300px;
+    }
+    @media print {
+        .no-print {
+            display: none !important;
+        }
+        .card {
+            break-inside: avoid;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <!-- Results Header -->
+            <div class="card border-0 shadow-lg mb-4">
+                <div class="card-body p-5 text-center">
+                    <div class="mb-4">
+                        {% if exam.score >= 80 %}
+                            <i class="bi bi-trophy-fill text-warning" style="font-size: 5rem;"></i>
+                        {% elif exam.score >= 60 %}
+                            <i class="bi bi-emoji-smile-fill text-success" style="font-size: 5rem;"></i>
+                        {% else %}
+                            <i class="bi bi-emoji-neutral-fill text-secondary" style="font-size: 5rem;"></i>
+                        {% endif %}
+                    </div>
+
+                    <h1 class="display-4 mb-3">Exam Completed!</h1>
+                    <p class="text-muted">
+                        Completed on {{ exam.completed_at.strftime('%B %d, %Y at %I:%M %p') }}
+                    </p>
+
+                    <!-- Statistics Cards -->
+                    <div class="row justify-content-center mt-4">
+                        <div class="col-md-3">
+                            <div class="stat-card p-3 bg-light rounded shadow-sm">
+                                <div class="small text-muted mb-1">Your Score</div>
+                                <div class="h2 mb-0 fw-bold
+                                    {% if exam.score >= 80 %}text-success
+                                    {% elif exam.score >= 60 %}text-primary
+                                    {% else %}text-danger{% endif %}">
+                                    {{ "%.1f"|format(exam.score) }}%
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="stat-card p-3 bg-light rounded shadow-sm">
+                                <div class="small text-muted mb-1">Correct</div>
+                                <div class="h2 mb-0 fw-bold text-success">
+                                    {{ exam_questions|selectattr('is_correct', 'equalto', True)|list|length }}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="stat-card p-3 bg-light rounded shadow-sm">
+                                <div class="small text-muted mb-1">Wrong</div>
+                                <div class="h2 mb-0 fw-bold text-danger">
+                                    {{ exam_questions|selectattr('is_correct', 'equalto', False)|list|length }}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="stat-card p-3 bg-light rounded shadow-sm">
+                                <div class="small text-muted mb-1">Total</div>
+                                <div class="h2 mb-0 fw-bold text-primary">
+                                    {{ exam.total_questions }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if exam.score >= 80 %}
+                        <div class="alert alert-success mt-4 mb-0">
+                            <i class="bi bi-star-fill me-2"></i>
+                            <strong>Excellent!</strong> You demonstrated a strong understanding of the material.
+                        </div>
+                    {% elif exam.score >= 60 %}
+                        <div class="alert alert-primary mt-4 mb-0">
+                            <i class="bi bi-check-circle-fill me-2"></i>
+                            <strong>Good job!</strong> You passed with a decent score. Keep practicing to improve further.
+                        </div>
+                    {% else %}
+                        <div class="alert alert-warning mt-4 mb-0">
+                            <i class="bi bi-info-circle-fill me-2"></i>
+                            <strong>Keep learning!</strong> Review the material and try again to improve your score.
+                        </div>
+                    {% endif %}
+
+                    <div class="mt-4 no-print">
+                        <a href="{{ url_for('exam') }}" class="btn btn-primary btn-lg me-2">
+                            <i class="bi bi-arrow-repeat me-2"></i>Take Another Exam
+                        </a>
+                        <a href="{{ url_for('results') }}" class="btn btn-outline-secondary btn-lg me-2">
+                            <i class="bi bi-bar-chart-fill me-2"></i>View All Results
+                        </a>
+                        <a href="{{ url_for('download_exam_pdf', exam_id=exam.id) }}" class="btn btn-success btn-lg">
+                            <i class="bi bi-download me-2"></i>Download PDF
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Performance Analytics -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0">
+                                <i class="bi bi-pie-chart me-2"></i>
+                                Score Breakdown
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container">
+                                <canvas id="scoreChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-header bg-info text-white">
+                            <h5 class="mb-0">
+                                <i class="bi bi-clock-history me-2"></i>
+                                Time Analysis
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            {% set total_time = exam_questions|sum(attribute='time_spent')|default(0) %}
+                            {% set avg_time = (total_time / exam_questions|length)|round(1) if exam_questions|length > 0 else 0 %}
+
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span><i class="bi bi-hourglass-split me-2"></i>Total Time:</span>
+                                    <strong>{{ '%d:%02d'|format(total_time // 60, total_time % 60) }} min</strong>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span><i class="bi bi-speedometer2 me-2"></i>Average per Question:</span>
+                                    <strong>{{ '%.1f'|format(avg_time) }} sec</strong>
+                                </div>
+                            </div>
+
+                            <div class="chart-container">
+                                <canvas id="timeChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Difficulty Analysis -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-bar-chart-line me-2"></i>
+                        Performance by Difficulty
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% set easy_questions = exam_questions|selectattr('question.difficulty', 'equalto', 'easy')|list %}
+                        {% set medium_questions = exam_questions|selectattr('question.difficulty', 'equalto', 'medium')|list %}
+                        {% set hard_questions = exam_questions|selectattr('question.difficulty', 'equalto', 'hard')|list %}
+
+                        {% if easy_questions|length > 0 %}
+                        <div class="col-md-4">
+                            <div class="text-center p-3 bg-light rounded">
+                                <h6 class="text-success mb-2">Easy</h6>
+                                <div class="display-6 fw-bold">
+                                    {{ easy_questions|selectattr('is_correct', 'equalto', True)|list|length }} / {{ easy_questions|length }}
+                                </div>
+                                <small class="text-muted">
+                                    {{ ((easy_questions|selectattr('is_correct', 'equalto', True)|list|length / easy_questions|length) * 100)|round(0)|int }}% correct
+                                </small>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        {% if medium_questions|length > 0 %}
+                        <div class="col-md-4">
+                            <div class="text-center p-3 bg-light rounded">
+                                <h6 class="text-warning mb-2">Medium</h6>
+                                <div class="display-6 fw-bold">
+                                    {{ medium_questions|selectattr('is_correct', 'equalto', True)|list|length }} / {{ medium_questions|length }}
+                                </div>
+                                <small class="text-muted">
+                                    {{ ((medium_questions|selectattr('is_correct', 'equalto', True)|list|length / medium_questions|length) * 100)|round(0)|int }}% correct
+                                </small>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        {% if hard_questions|length > 0 %}
+                        <div class="col-md-4">
+                            <div class="text-center p-3 bg-light rounded">
+                                <h6 class="text-danger mb-2">Hard</h6>
+                                <div class="display-6 fw-bold">
+                                    {{ hard_questions|selectattr('is_correct', 'equalto', True)|list|length }} / {{ hard_questions|length }}
+                                </div>
+                                <small class="text-muted">
+                                    {{ ((hard_questions|selectattr('is_correct', 'equalto', True)|list|length / hard_questions|length) * 100)|round(0)|int }}% correct
+                                </small>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detailed Results -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-list-check me-2"></i>
+                        Question-by-Question Review
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    {% for eq in exam_questions %}
+                    <div class="p-4 {% if not loop.last %}border-bottom{% endif %}">
+                        <div class="d-flex align-items-start">
+                            <div class="me-3">
+                                {% if eq.is_correct %}
+                                    <i class="bi bi-check-circle-fill text-success" style="font-size: 1.5rem;"></i>
+                                {% else %}
+                                    <i class="bi bi-x-circle-fill text-danger" style="font-size: 1.5rem;"></i>
+                                {% endif %}
+                            </div>
+                            <div class="flex-grow-1">
+                                <div class="mb-2">
+                                    <span class="badge bg-secondary">Question {{ loop.index }}</span>
+                                    <span class="badge bg-info ms-2">{{ eq.question.difficulty|title }}</span>
+                                    <span class="badge bg-primary ms-2">{{ eq.question.question_type|replace('_', ' ')|title }}</span>
+                                    {% if eq.time_spent %}
+                                        <span class="badge bg-dark ms-2">
+                                            <i class="bi bi-clock me-1"></i>
+                                            {{ '%d:%02d'|format(eq.time_spent // 60, eq.time_spent % 60) }}
+                                        </span>
+                                    {% endif %}
+                                </div>
+
+                                <h6 class="mb-3">{{ eq.question.question_text }}</h6>
+
+                                {% if eq.question.question_type == 'mcq' %}
+                                    <!-- Show all options for MCQ -->
+                                    <div class="mb-3">
+                                        {% for option_key, option_value in eq.question.options_json.items() %}
+                                        <div class="p-2 mb-2 rounded
+                                            {% if option_key == eq.question.correct_answer %}bg-success bg-opacity-10 border border-success
+                                            {% elif option_key == eq.user_answer and option_key != eq.question.correct_answer %}bg-danger bg-opacity-10 border border-danger
+                                            {% else %}bg-light{% endif %}">
+                                            <strong>{{ option_key }}.</strong> {{ option_value }}
+                                            {% if option_key == eq.question.correct_answer %}
+                                                <span class="badge bg-success ms-2">Correct Answer</span>
+                                            {% endif %}
+                                            {% if option_key == eq.user_answer and option_key != eq.question.correct_answer %}
+                                                <span class="badge bg-danger ms-2">Your Answer</span>
+                                            {% endif %}
+                                            {% if option_key == eq.user_answer and option_key == eq.question.correct_answer %}
+                                                <span class="badge bg-success ms-2">Your Answer</span>
+                                            {% endif %}
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                {% elif eq.question.question_type == 'true_false' %}
+                                    <div class="mb-3">
+                                        <div class="p-2 mb-2 rounded {% if eq.question.correct_answer|lower == 'true' %}bg-success bg-opacity-10 border border-success{% else %}bg-light{% endif %}">
+                                            <i class="bi bi-check-circle text-success me-2"></i>
+                                            <strong>True</strong>
+                                            {% if eq.question.correct_answer|lower == 'true' %}
+                                                <span class="badge bg-success ms-2">Correct Answer</span>
+                                            {% endif %}
+                                            {% if eq.user_answer|lower == 'true' and eq.user_answer|lower == eq.question.correct_answer|lower %}
+                                                <span class="badge bg-success ms-2">Your Answer</span>
+                                            {% elif eq.user_answer|lower == 'true' and eq.user_answer|lower != eq.question.correct_answer|lower %}
+                                                <span class="badge bg-danger ms-2">Your Answer</span>
+                                            {% endif %}
+                                        </div>
+                                        <div class="p-2 mb-2 rounded {% if eq.question.correct_answer|lower == 'false' %}bg-success bg-opacity-10 border border-success{% else %}bg-light{% endif %}">
+                                            <i class="bi bi-x-circle text-danger me-2"></i>
+                                            <strong>False</strong>
+                                            {% if eq.question.correct_answer|lower == 'false' %}
+                                                <span class="badge bg-success ms-2">Correct Answer</span>
+                                            {% endif %}
+                                            {% if eq.user_answer|lower == 'false' and eq.user_answer|lower == eq.question.correct_answer|lower %}
+                                                <span class="badge bg-success ms-2">Your Answer</span>
+                                            {% elif eq.user_answer|lower == 'false' and eq.user_answer|lower != eq.question.correct_answer|lower %}
+                                                <span class="badge bg-danger ms-2">Your Answer</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                {% endif %}
+
+                                {% if eq.question.explanation %}
+                                <div class="alert alert-info mb-0">
+                                    <strong><i class="bi bi-lightbulb me-2"></i>Explanation:</strong>
+                                    <p class="mb-0 mt-2">{{ eq.question.explanation }}</p>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="text-center mb-4 no-print">
+                <a href="{{ url_for('exam') }}" class="btn btn-primary btn-lg me-2">
+                    <i class="bi bi-arrow-repeat me-2"></i>Take Another Exam
+                </a>
+                <a href="{{ url_for('results') }}" class="btn btn-outline-secondary btn-lg me-2">
+                    <i class="bi bi-bar-chart-fill me-2"></i>View All Results
+                </a>
+                <button onclick="window.print()" class="btn btn-outline-primary btn-lg me-2">
+                    <i class="bi bi-printer me-2"></i>Print
+                </button>
+                <a href="{{ url_for('download_exam_pdf', exam_id=exam.id) }}" class="btn btn-success btn-lg">
+                    <i class="bi bi-download me-2"></i>Download PDF
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<script>
+    // Score Breakdown Pie Chart
+    const correctCount = {{ exam_questions|selectattr('is_correct', 'equalto', True)|list|length }};
+    const wrongCount = {{ exam_questions|selectattr('is_correct', 'equalto', False)|list|length }};
+
+    const scoreCtx = document.getElementById('scoreChart').getContext('2d');
+    new Chart(scoreCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Correct', 'Wrong'],
+            datasets: [{
+                data: [correctCount, wrongCount],
+                backgroundColor: ['#198754', '#dc3545'],
+                borderWidth: 2,
+                borderColor: '#fff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                },
+                title: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const total = correctCount + wrongCount;
+                            const percentage = ((context.parsed / total) * 100).toFixed(1);
+                            return context.label + ': ' + context.parsed + ' (' + percentage + '%)';
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Time Analysis Bar Chart
+    const questionNumbers = [{% for eq in exam_questions %}'Q{{ loop.index }}'{% if not loop.last %}, {% endif %}{% endfor %}];
+    const timesSpent = [{% for eq in exam_questions %}{{ eq.time_spent|default(0) }}{% if not loop.last %}, {% endif %}{% endfor %}];
+    const correctness = [{% for eq in exam_questions %}{{ 'true' if eq.is_correct else 'false' }}{% if not loop.last %}, {% endif %}{% endfor %}];
+
+    const timeCtx = document.getElementById('timeChart').getContext('2d');
+    new Chart(timeCtx, {
+        type: 'bar',
+        data: {
+            labels: questionNumbers,
+            datasets: [{
+                label: 'Time Spent (seconds)',
+                data: timesSpent,
+                backgroundColor: timesSpent.map((time, index) => correctness[index] === true ? 'rgba(25, 135, 84, 0.7)' : 'rgba(220, 53, 69, 0.7)'),
+                borderColor: timesSpent.map((time, index) => correctness[index] === true ? 'rgba(25, 135, 84, 1)' : 'rgba(220, 53, 69, 1)'),
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const seconds = context.parsed.y;
+                            const minutes = Math.floor(seconds / 60);
+                            const remainingSeconds = seconds % 60;
+                            return 'Time: ' + minutes + ':' + remainingSeconds.toString().padStart(2, '0');
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Seconds'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Questions'
+                    }
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}
