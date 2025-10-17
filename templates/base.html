@@ -17,6 +17,16 @@
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 
+    <!-- Organization Theme -->
+    {% if org_settings %}
+    <style>
+        {{ org_settings.get_theme_css()|safe }}
+        {% if org_settings.custom_css %}
+        {{ org_settings.custom_css|safe }}
+        {% endif %}
+    </style>
+    {% endif %}
+
     {% block extra_css %}{% endblock %}
 </head>
 <body>
@@ -24,8 +34,12 @@
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
         <div class="container">
             <a class="navbar-brand d-flex align-items-center" href="{{ url_for('index') }}">
-                <i class="bi bi-mortarboard-fill me-2"></i>
-                <span class="fw-bold">Exam Simulator</span>
+                {% if org_settings and org_settings.logo_filename %}
+                    <img src="{{ org_settings.get_logo_url() }}" alt="{{ org_settings.display_name }}" style="height: 40px; margin-right: 10px;">
+                {% else %}
+                    <i class="bi bi-mortarboard-fill me-2"></i>
+                {% endif %}
+                <span class="fw-bold">{{ org_settings.display_name if org_settings else 'Exam Simulator' }}</span>
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
@@ -33,68 +47,111 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
                     {% if current_user.is_authenticated %}
+                        <!-- Home -->
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('index') }}">
                                 <i class="bi bi-house-fill me-1"></i>Home
                             </a>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('upload') }}">
-                                <i class="bi bi-cloud-upload-fill me-1"></i>Upload
+
+                        <!-- Content Dropdown -->
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="contentDropdown" role="button" data-bs-toggle="dropdown">
+                                <i class="bi bi-folder-fill me-1"></i>Content
                             </a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="{{ url_for('documents') }}">
+                                    <i class="bi bi-folder me-2"></i>My Documents
+                                </a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('upload') }}">
+                                    <i class="bi bi-cloud-upload me-2"></i>Upload Document
+                                </a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="{{ url_for('question_bank') }}">
+                                    <i class="bi bi-bank me-2"></i>Question Bank
+                                </a></li>
+                                {% if current_user.role in ['teacher', 'admin', 'superadmin'] %}
+                                <li><a class="dropdown-item" href="{{ url_for('upload_csv_questions') }}">
+                                    <i class="bi bi-file-earmark-spreadsheet me-2"></i>Import CSV Questions
+                                </a></li>
+                                {% endif %}
+                            </ul>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('documents') }}">
-                                <i class="bi bi-folder-fill me-1"></i>Documents
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('question_bank') }}">
-                                <i class="bi bi-bank me-1"></i>Question Bank
-                            </a>
-                        </li>
-                        {% if current_user.role in ['teacher', 'admin'] %}
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('upload_csv_questions') }}">
-                                <i class="bi bi-file-earmark-spreadsheet me-1"></i>Upload CSV
-                            </a>
-                        </li>
-                        {% endif %}
+
+                        <!-- Exam -->
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('exam') }}">
                                 <i class="bi bi-pencil-square me-1"></i>Take Exam
                             </a>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('results') }}">
-                                <i class="bi bi-bar-chart-fill me-1"></i>Results
+
+                        <!-- Performance Dropdown -->
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="performanceDropdown" role="button" data-bs-toggle="dropdown">
+                                <i class="bi bi-graph-up me-1"></i>Performance
                             </a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="{{ url_for('results') }}">
+                                    <i class="bi bi-bar-chart-fill me-2"></i>My Results
+                                </a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('analytics') }}">
+                                    <i class="bi bi-graph-up-arrow me-2"></i>Analytics
+                                </a></li>
+                            </ul>
                         </li>
-                        {% if current_user.role in ['teacher', 'admin'] %}
+
+                        <!-- Organization Members (if applicable) -->
+                        {% if current_user.organization %}
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('settings') }}">
-                                <i class="bi bi-gear-fill me-1"></i>Settings
+                            <a class="nav-link" href="{{ url_for('organization_members') }}">
+                                <i class="bi bi-people-fill me-1"></i>Members
                             </a>
                         </li>
                         {% endif %}
-                        {% if current_user.role == 'admin' %}
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('admin_dashboard') }}">
-                                <i class="bi bi-speedometer2 me-1"></i>Admin
+
+                        <!-- Admin Dropdown (for admins/superadmins) -->
+                        {% if current_user.role in ['admin', 'superadmin'] %}
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="adminDropdown" role="button" data-bs-toggle="dropdown">
+                                <i class="bi bi-shield-fill me-1"></i>Admin
+                                {% if current_user.role == 'superadmin' %}
+                                <span class="badge bg-warning text-dark ms-1">Super</span>
+                                {% endif %}
                             </a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="{{ url_for('admin_dashboard') }}">
+                                    <i class="bi bi-speedometer2 me-2"></i>Dashboard
+                                </a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="{{ url_for('admin_users') }}">
+                                    <i class="bi bi-people me-2"></i>Manage Users
+                                </a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('admin_documents') }}">
+                                    <i class="bi bi-folder me-2"></i>Manage Documents
+                                </a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="{{ url_for('settings') }}">
+                                    <i class="bi bi-key-fill me-2"></i>{% if current_user.role == 'superadmin' %}Organization {% endif %}API Keys
+                                </a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('organization_settings') }}">
+                                    <i class="bi bi-palette me-2"></i>Organization Branding
+                                </a></li>
+                            </ul>
                         </li>
                         {% endif %}
+
+                        <!-- User Dropdown -->
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
                                 <i class="bi bi-person-circle me-1"></i>{{ current_user.name }}
                             </a>
                             <ul class="dropdown-menu dropdown-menu-end">
-                                {% if current_user.role in ['teacher', 'admin'] %}
-                                <li><a class="dropdown-item" href="{{ url_for('settings') }}">
-                                    <i class="bi bi-gear me-2"></i>AI Settings
-                                </a></li>
-                                <li><hr class="dropdown-divider"></li>
-                                {% endif %}
+                                <li class="dropdown-header">
+                                    <small class="text-muted">{{ current_user.email }}</small><br>
+                                    <span class="badge bg-{{ 'danger' if current_user.role == 'admin' or current_user.role == 'superadmin' else 'info' if current_user.role == 'teacher' else 'success' }}">
+                                        {{ current_user.role|title }}
+                                    </span>
+                                </li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="{{ url_for('logout') }}">
                                     <i class="bi bi-box-arrow-right me-2"></i>Logout
@@ -149,38 +206,63 @@
     <!-- Footer -->
     <footer class="bg-dark text-white mt-5 py-4">
         <div class="container">
-            <div class="row">
-                <div class="col-md-6">
-                    <h5 class="mb-3">
-                        <i class="bi bi-mortarboard-fill me-2"></i>Exam Simulator
-                    </h5>
-                    <p class="text-muted">AI-powered exam generation from your study materials.</p>
+            {% if org_settings and org_settings.custom_footer_html %}
+                <!-- Custom Organization Footer -->
+                <div class="custom-footer-content">
+                    {{ org_settings.custom_footer_html|safe }}
                 </div>
-                <div class="col-md-3">
-                    <h6 class="mb-3">Quick Links</h6>
-                    <ul class="list-unstyled">
-                        <li><a href="{{ url_for('index') }}" class="text-muted text-decoration-none">Home</a></li>
-                        {% if current_user.is_authenticated %}
-                            <li><a href="{{ url_for('upload') }}" class="text-muted text-decoration-none">Upload</a></li>
-                            <li><a href="{{ url_for('exam') }}" class="text-muted text-decoration-none">Take Exam</a></li>
-                        {% else %}
-                            <li><a href="{{ url_for('login') }}" class="text-muted text-decoration-none">Login</a></li>
-                            <li><a href="{{ url_for('register') }}" class="text-muted text-decoration-none">Register</a></li>
+            {% else %}
+                <!-- Default Footer -->
+                <div class="row">
+                    <div class="col-md-6">
+                        <h5 class="mb-3">
+                            {% if org_settings and org_settings.logo_filename %}
+                                <img src="{{ org_settings.get_logo_url() }}" alt="{{ org_settings.display_name }}" style="height: 30px; margin-right: 10px;">
+                            {% else %}
+                                <i class="bi bi-mortarboard-fill me-2"></i>
+                            {% endif %}
+                            {{ org_settings.display_name if org_settings else 'Exam Simulator' }}
+                        </h5>
+                        <p class="text-muted">AI-powered exam generation from your study materials.</p>
+                        {% if org_settings and org_settings.contact_email %}
+                        <p class="text-muted">
+                            <i class="bi bi-envelope me-2"></i>{{ org_settings.contact_email }}
+                        </p>
                         {% endif %}
-                    </ul>
+                    </div>
+                    <div class="col-md-3">
+                        <h6 class="mb-3">Quick Links</h6>
+                        <ul class="list-unstyled">
+                            <li><a href="{{ url_for('index') }}" class="text-muted text-decoration-none">Home</a></li>
+                            {% if current_user.is_authenticated %}
+                                <li><a href="{{ url_for('upload') }}" class="text-muted text-decoration-none">Upload</a></li>
+                                <li><a href="{{ url_for('exam') }}" class="text-muted text-decoration-none">Take Exam</a></li>
+                            {% else %}
+                                <li><a href="{{ url_for('login') }}" class="text-muted text-decoration-none">Login</a></li>
+                                <li><a href="{{ url_for('register') }}" class="text-muted text-decoration-none">Register</a></li>
+                            {% endif %}
+                        </ul>
+                    </div>
+                    <div class="col-md-3">
+                        <h6 class="mb-3">Support</h6>
+                        <ul class="list-unstyled">
+                            {% if org_settings and org_settings.support_url %}
+                            <li><a href="{{ org_settings.support_url }}" class="text-muted text-decoration-none" target="_blank">Support Center</a></li>
+                            {% endif %}
+                            <li><a href="#" class="text-muted text-decoration-none">Documentation</a></li>
+                            {% if org_settings and org_settings.contact_email %}
+                            <li><a href="mailto:{{ org_settings.contact_email }}" class="text-muted text-decoration-none">Contact Us</a></li>
+                            {% else %}
+                            <li><a href="#" class="text-muted text-decoration-none">Contact Us</a></li>
+                            {% endif %}
+                            <li><a href="#" class="text-muted text-decoration-none">FAQ</a></li>
+                        </ul>
+                    </div>
                 </div>
-                <div class="col-md-3">
-                    <h6 class="mb-3">Support</h6>
-                    <ul class="list-unstyled">
-                        <li><a href="#" class="text-muted text-decoration-none">Documentation</a></li>
-                        <li><a href="#" class="text-muted text-decoration-none">Contact Us</a></li>
-                        <li><a href="#" class="text-muted text-decoration-none">FAQ</a></li>
-                    </ul>
-                </div>
-            </div>
+            {% endif %}
             <hr class="bg-secondary my-4">
             <div class="text-center text-muted">
-                <small>&copy; 2024 Exam Simulator. All rights reserved.</small>
+                <small>&copy; 2024 {{ org_settings.display_name if org_settings else 'Exam Simulator' }}. All rights reserved.</small>
             </div>
         </div>
     </footer>

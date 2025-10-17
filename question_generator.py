@@ -31,26 +31,20 @@ AI_MODELS = {
 }
 
 
-def get_openai_client():
-    """Get or initialize OpenAI client"""
-    global openai_client
-    if openai_client is None:
-        api_key = os.getenv('OPENAI_API_KEY')
-        if not api_key:
-            raise ValueError("OpenAI API key not found. Please set OPENAI_API_KEY in .env file")
-        openai_client = OpenAI(api_key=api_key)
-    return openai_client
+def get_openai_client(api_key: Optional[str] = None):
+    """Get or initialize OpenAI client with required organization API key"""
+    if not api_key:
+        raise ValueError("OpenAI API key is required. Please configure your organization's OpenAI API key in Organization Settings.")
+
+    return OpenAI(api_key=api_key)
 
 
-def configure_gemini():
-    """Configure Google Gemini API"""
-    global gemini_configured
-    if not gemini_configured:
-        api_key = os.getenv('GEMINI_API_KEY') or os.getenv('GOOGLE_API_KEY')
-        if not api_key:
-            raise ValueError("Gemini API key not found. Please set GEMINI_API_KEY or GOOGLE_API_KEY in .env file")
-        genai.configure(api_key=api_key)
-        gemini_configured = True
+def configure_gemini(api_key: Optional[str] = None):
+    """Configure Google Gemini API with required organization API key"""
+    if not api_key:
+        raise ValueError("Gemini API key is required. Please configure your organization's Gemini API key in Organization Settings.")
+
+    genai.configure(api_key=api_key)
 
 
 # Rate limiting configuration
@@ -304,7 +298,8 @@ def validate_short_answer_question(question: Dict) -> Tuple[bool, str]:
 # AI PROVIDER FUNCTIONS
 # ============================================================================
 
-def call_ai_api(prompt: str, provider: str = 'gemini', model: str = 'gemini-2.5-flash', temperature: float = 0.7) -> Tuple[Optional[str], Optional[str]]:
+def call_ai_api(prompt: str, provider: str = 'gemini', model: str = 'gemini-2.5-flash', temperature: float = 0.7,
+                openai_api_key: Optional[str] = None, gemini_api_key: Optional[str] = None) -> Tuple[Optional[str], Optional[str]]:
     """
     Universal function to call either OpenAI or Gemini API
 
@@ -313,13 +308,15 @@ def call_ai_api(prompt: str, provider: str = 'gemini', model: str = 'gemini-2.5-
         provider: 'openai' or 'gemini'
         model: Model name
         temperature: Sampling temperature
+        openai_api_key: Optional organization-specific OpenAI API key
+        gemini_api_key: Optional organization-specific Gemini API key
 
     Returns:
         Tuple of (response_text, error_message)
     """
     try:
         if provider == 'openai':
-            client = get_openai_client()
+            client = get_openai_client(openai_api_key)
             response = client.chat.completions.create(
                 model=model,
                 messages=[
@@ -332,7 +329,7 @@ def call_ai_api(prompt: str, provider: str = 'gemini', model: str = 'gemini-2.5-
             return response.choices[0].message.content, None
 
         elif provider == 'gemini':
-            configure_gemini()
+            configure_gemini(gemini_api_key)
             gemini_model = genai.GenerativeModel(model)
             response = gemini_model.generate_content(
                 prompt,
@@ -360,7 +357,9 @@ def generate_mcq_questions(
     num_questions: int = 5,
     model: str = "gemini-2.5-flash",
     temperature: float = 0.7,
-    provider: str = 'gemini'
+    provider: str = 'gemini',
+    openai_api_key: Optional[str] = None,
+    gemini_api_key: Optional[str] = None
 ) -> Tuple[Optional[List[Dict]], Optional[str]]:
     """
     Generate multiple choice questions from text using AI API
@@ -371,6 +370,8 @@ def generate_mcq_questions(
         model: AI model to use
         temperature: Sampling temperature (0.0 to 1.0)
         provider: 'openai' or 'gemini'
+        openai_api_key: Optional organization-specific OpenAI API key
+        gemini_api_key: Optional organization-specific Gemini API key
 
     Returns:
         Tuple of (questions_list, error_message)
@@ -393,8 +394,8 @@ def generate_mcq_questions(
 
         print(f"[MCQ] Calling AI API...")
 
-        # Call AI API (OpenAI or Gemini)
-        response_text, error = call_ai_api(prompt, provider, model, temperature)
+        # Call AI API (OpenAI or Gemini) with optional organization API keys
+        response_text, error = call_ai_api(prompt, provider, model, temperature, openai_api_key, gemini_api_key)
 
         if error:
             print(f"[MCQ] API Error: {error}")
@@ -442,7 +443,9 @@ def generate_true_false_questions(
     num_questions: int = 5,
     model: str = "gemini-2.5-flash",
     temperature: float = 0.7,
-    provider: str = 'gemini'
+    provider: str = 'gemini',
+    openai_api_key: Optional[str] = None,
+    gemini_api_key: Optional[str] = None
 ) -> Tuple[Optional[List[Dict]], Optional[str]]:
     """
     Generate True/False questions from text using AI API
@@ -453,6 +456,8 @@ def generate_true_false_questions(
         model: AI model to use
         temperature: Sampling temperature (0.0 to 1.0)
         provider: 'openai' or 'gemini'
+        openai_api_key: Optional organization-specific OpenAI API key
+        gemini_api_key: Optional organization-specific Gemini API key
 
     Returns:
         Tuple of (questions_list, error_message)
@@ -471,8 +476,8 @@ def generate_true_false_questions(
             text=text[:4000]  # Limit text length to avoid token limits
         )
 
-        # Call AI API (OpenAI or Gemini)
-        response_text, error = call_ai_api(prompt, provider, model, temperature)
+        # Call AI API (OpenAI or Gemini) with optional organization API keys
+        response_text, error = call_ai_api(prompt, provider, model, temperature, openai_api_key, gemini_api_key)
 
         if error:
             return None, error
@@ -509,7 +514,9 @@ def generate_short_answer_questions(
     num_questions: int = 5,
     model: str = "gemini-2.5-flash",
     temperature: float = 0.7,
-    provider: str = 'gemini'
+    provider: str = 'gemini',
+    openai_api_key: Optional[str] = None,
+    gemini_api_key: Optional[str] = None
 ) -> Tuple[Optional[List[Dict]], Optional[str]]:
     """
     Generate Short Answer questions from text using AI API
@@ -520,6 +527,8 @@ def generate_short_answer_questions(
         model: AI model to use
         temperature: Sampling temperature (0.0 to 1.0)
         provider: 'openai' or 'gemini'
+        openai_api_key: Optional organization-specific OpenAI API key
+        gemini_api_key: Optional organization-specific Gemini API key
 
     Returns:
         Tuple of (questions_list, error_message)
@@ -538,8 +547,8 @@ def generate_short_answer_questions(
             text=text[:4000]  # Limit text length to avoid token limits
         )
 
-        # Call AI API (OpenAI or Gemini)
-        response_text, error = call_ai_api(prompt, provider, model, temperature)
+        # Call AI API (OpenAI or Gemini) with optional organization API keys
+        response_text, error = call_ai_api(prompt, provider, model, temperature, openai_api_key, gemini_api_key)
 
         if error:
             return None, error
@@ -615,7 +624,9 @@ def generate_questions_mixed(
     num_true_false: int = 2,
     num_short_answer: int = 2,
     model: str = "gemini-2.5-flash",
-    provider: str = 'gemini'
+    provider: str = 'gemini',
+    openai_api_key: Optional[str] = None,
+    gemini_api_key: Optional[str] = None
 ) -> Dict[str, any]:
     """
     Generate a mix of different question types from text
@@ -627,6 +638,8 @@ def generate_questions_mixed(
         num_short_answer: Number of Short Answer questions
         model: AI model to use
         provider: 'openai' or 'gemini'
+        openai_api_key: Optional organization-specific OpenAI API key
+        gemini_api_key: Optional organization-specific Gemini API key
 
     Returns:
         Dictionary with questions and any errors
@@ -640,7 +653,8 @@ def generate_questions_mixed(
 
     # Generate MCQs
     if num_mcq > 0:
-        mcq_questions, error = generate_mcq_questions(text, num_mcq, model, temperature=0.7, provider=provider)
+        mcq_questions, error = generate_mcq_questions(text, num_mcq, model, temperature=0.7, provider=provider,
+                                                       openai_api_key=openai_api_key, gemini_api_key=gemini_api_key)
         if mcq_questions:
             results['mcq'] = mcq_questions
         if error:
@@ -649,7 +663,8 @@ def generate_questions_mixed(
 
     # Generate True/False
     if num_true_false > 0:
-        tf_questions, error = generate_true_false_questions(text, num_true_false, model, temperature=0.7, provider=provider)
+        tf_questions, error = generate_true_false_questions(text, num_true_false, model, temperature=0.7, provider=provider,
+                                                             openai_api_key=openai_api_key, gemini_api_key=gemini_api_key)
         if tf_questions:
             results['true_false'] = tf_questions
         if error:
@@ -658,7 +673,8 @@ def generate_questions_mixed(
 
     # Generate Short Answer
     if num_short_answer > 0:
-        sa_questions, error = generate_short_answer_questions(text, num_short_answer, model, temperature=0.7, provider=provider)
+        sa_questions, error = generate_short_answer_questions(text, num_short_answer, model, temperature=0.7, provider=provider,
+                                                               openai_api_key=openai_api_key, gemini_api_key=gemini_api_key)
         if sa_questions:
             results['short_answer'] = sa_questions
         if error:

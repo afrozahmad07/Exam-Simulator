@@ -68,6 +68,69 @@
             </div>
         </div>
 
+        {% if current_user.role == 'superadmin' %}
+        <!-- Superadmin Dashboard Access -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="alert alert-warning border-0 shadow-sm" role="alert">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <i class="bi bi-shield-fill-check" style="font-size: 3rem;"></i>
+                        </div>
+                        <div class="flex-grow-1 ms-4">
+                            <h4 class="alert-heading mb-2">
+                                <i class="bi bi-shield-check me-2"></i>Superadmin Access
+                                <span class="badge bg-dark ms-2">SUPERADMIN</span>
+                            </h4>
+                            <p class="mb-3">You have full system access. Manage all organizations, API keys, and system settings.</p>
+                            <div class="d-flex flex-wrap gap-2">
+                                <a href="{{ url_for('admin_dashboard') }}" class="btn btn-dark">
+                                    <i class="bi bi-speedometer2 me-2"></i>Admin Dashboard
+                                </a>
+                                <a href="{{ url_for('settings') }}" class="btn btn-outline-dark">
+                                    <i class="bi bi-key-fill me-2"></i>Manage API Keys
+                                </a>
+                                <a href="{{ url_for('organization_settings') }}" class="btn btn-outline-dark">
+                                    <i class="bi bi-palette me-2"></i>Organization Branding
+                                </a>
+                                <a href="{{ url_for('admin_users') }}" class="btn btn-outline-dark">
+                                    <i class="bi bi-people me-2"></i>Manage Users
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% elif current_user.role == 'admin' %}
+        <!-- Admin Dashboard Access -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="alert alert-info border-0 shadow-sm" role="alert">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <i class="bi bi-shield-fill" style="font-size: 2.5rem;"></i>
+                        </div>
+                        <div class="flex-grow-1 ms-4">
+                            <h5 class="alert-heading mb-2">
+                                <i class="bi bi-shield me-2"></i>Admin Access
+                            </h5>
+                            <p class="mb-3">Manage your organization's users, documents, and settings.</p>
+                            <div class="d-flex flex-wrap gap-2">
+                                <a href="{{ url_for('admin_dashboard') }}" class="btn btn-primary btn-sm">
+                                    <i class="bi bi-speedometer2 me-2"></i>Admin Dashboard
+                                </a>
+                                <a href="{{ url_for('settings') }}" class="btn btn-outline-primary btn-sm">
+                                    <i class="bi bi-key-fill me-2"></i>Configure API Keys
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
         <!-- Quick Actions -->
         <div class="row mb-4">
             <div class="col-12">

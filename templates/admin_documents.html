@@ -158,7 +158,11 @@
             <div class="card text-center">
                 <div class="card-body">
                     <i class="bi bi-database-fill text-warning" style="font-size: 2rem;"></i>
-                    <h3 class="mt-2">{{ (documents|sum(attribute='content')|length / 1024 / 1024)|round(1) }} MB</h3>
+                    {% set total_content_size = namespace(value=0) %}
+                    {% for doc in documents %}
+                        {% set total_content_size.value = total_content_size.value + (doc.content|length) %}
+                    {% endfor %}
+                    <h3 class="mt-2">{{ (total_content_size.value / 1024 / 1024)|round(1) }} MB</h3>
                     <p class="text-muted mb-0">Total Content</p>
                 </div>
             </div>
@@ -174,23 +178,32 @@
                 </div>
                 <div class="card-body">
                     <div class="row text-center">
-                        {% set pdf_count = documents|selectattr('filename', 'match', '.*\.pdf$')|list|length %}
-                        {% set docx_count = documents|selectattr('filename', 'match', '.*\.docx$')|list|length %}
-                        {% set txt_count = documents|selectattr('filename', 'match', '.*\.txt$')|list|length %}
+                        {% set pdf_count = namespace(value=0) %}
+                        {% set docx_count = namespace(value=0) %}
+                        {% set txt_count = namespace(value=0) %}
+                        {% for doc in documents %}
+                            {% if doc.filename.lower().endswith('.pdf') %}
+                                {% set pdf_count.value = pdf_count.value + 1 %}
+                            {% elif doc.filename.lower().endswith('.docx') %}
+                                {% set docx_count.value = docx_count.value + 1 %}
+                            {% elif doc.filename.lower().endswith('.txt') %}
+                                {% set txt_count.value = txt_count.value + 1 %}
+                            {% endif %}
+                        {% endfor %}
 
                         <div class="col-md-4">
                             <i class="bi bi-file-earmark-pdf-fill text-danger" style="font-size: 2rem;"></i>
-                            <h4 class="mt-2">{{ pdf_count }}</h4>
+                            <h4 class="mt-2">{{ pdf_count.value }}</h4>
                             <p class="text-muted">PDF Files</p>
                         </div>
                         <div class="col-md-4">
                             <i class="bi bi-file-earmark-word-fill text-primary" style="font-size: 2rem;"></i>
-                            <h4 class="mt-2">{{ docx_count }}</h4>
+                            <h4 class="mt-2">{{ docx_count.value }}</h4>
                             <p class="text-muted">DOCX Files</p>
                         </div>
                         <div class="col-md-4">
                             <i class="bi bi-file-earmark-text-fill text-secondary" style="font-size: 2rem;"></i>
-                            <h4 class="mt-2">{{ txt_count }}</h4>
+                            <h4 class="mt-2">{{ txt_count.value }}</h4>
                             <p class="text-muted">TXT Files</p>
                         </div>
                     </div>

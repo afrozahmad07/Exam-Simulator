@@ -117,6 +117,67 @@
         </div>
     </div>
 
+    <!-- Superadmin/Admin Settings Cards -->
+    <div class="row mb-4">
+        {% if is_superadmin %}
+        <div class="col-md-6 mb-3">
+            <div class="card h-100 border-warning">
+                <div class="card-header bg-warning text-dark">
+                    <i class="bi bi-key-fill me-2"></i>Organization API Keys
+                    <span class="badge bg-dark ms-2">Superadmin</span>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">Configure OpenAI and Gemini API keys for each organization. Required for AI-powered question generation.</p>
+                    <a href="{{ url_for('settings') }}" class="btn btn-warning">
+                        <i class="bi bi-arrow-right-circle me-2"></i>Manage API Keys
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 mb-3">
+            <div class="card h-100">
+                <div class="card-header bg-secondary text-white">
+                    <i class="bi bi-palette-fill me-2"></i>Organization Branding
+                    <span class="badge bg-dark ms-2">Superadmin</span>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">Customize organization logos, colors, and white-label settings.</p>
+                    <a href="{{ url_for('organization_settings') }}" class="btn btn-secondary">
+                        <i class="bi bi-arrow-right-circle me-2"></i>Customize Branding
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="col-md-6 mb-3">
+            <div class="card h-100 border-warning">
+                <div class="card-header bg-warning text-dark">
+                    <i class="bi bi-key-fill me-2"></i>AI API Keys
+                </div>
+                <div class="card-body">
+                    <p class="card-text">Configure OpenAI and Gemini API keys for your organization. Required for AI-powered question generation.</p>
+                    <a href="{{ url_for('settings') }}" class="btn btn-warning">
+                        <i class="bi bi-arrow-right-circle me-2"></i>Configure API Keys
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 mb-3">
+            <div class="card h-100">
+                <div class="card-header bg-secondary text-white">
+                    <i class="bi bi-palette-fill me-2"></i>Organization Branding
+                </div>
+                <div class="card-body">
+                    <p class="card-text">Customize your organization's logo, colors, and white-label settings.</p>
+                    <a href="{{ url_for('organization_settings') }}" class="btn btn-secondary">
+                        <i class="bi bi-arrow-right-circle me-2"></i>Customize Branding
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
     <!-- Organizations Card -->
     <div class="row mb-4">
         <div class="col-md-12">

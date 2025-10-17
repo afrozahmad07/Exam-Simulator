@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 import openai
 
 # Import database models
-from models import User, Document, Question, Exam, ExamQuestion, get_engine, get_session
+from models import User, Document, Question, Exam, ExamQuestion, OrganizationSettings, get_engine, get_session
 
 # Import utility functions
 from utils import (
@@ -65,6 +65,9 @@ login_manager.login_view = 'login'
 # Ensure upload folder exists
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
+# Ensure logos folder exists for organization branding
+os.makedirs(os.path.join('static', 'logos'), exist_ok=True)
+
 
 def allowed_file(filename):
     """Check if file extension is allowed"""
@@ -105,8 +108,27 @@ def admin_required(f):
             flash('Please log in to access this page', 'error')
             return redirect(url_for('login', next=request.url))
 
-        if current_user.role != 'admin':
+        if current_user.role not in ['admin', 'superadmin']:
             flash('Admin access required', 'error')
+            abort(403)
+
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+def superadmin_required(f):
+    """
+    Decorator to require superadmin role for accessing a route
+    Usage: @superadmin_required
+    """
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated:
+            flash('Please log in to access this page', 'error')
+            return redirect(url_for('login', next=request.url))
+
+        if not current_user.is_superadmin():
+            flash('Superadmin access required', 'error')
             abort(403)
 
         return f(*args, **kwargs)
@@ -122,6 +144,45 @@ def load_user(user_id):
         return user
     except:
         return None
+    finally:
+        db_session.close()
+
+
+@app.context_processor
+def inject_org_settings():
+    """Make organization settings available to all templates"""
+    db_session = get_session(db_engine)
+    try:
+        org_settings = None
+
+        # Try to get organization from current user
+        if current_user.is_authenticated and current_user.organization:
+            org_settings = db_session.query(OrganizationSettings)\
+                .filter_by(organization_name=current_user.organization)\
+                .first()
+
+        # If no org settings found, try to get from subdomain or path
+        if not org_settings:
+            # Check subdomain
+            host = request.host.split(':')[0]
+            subdomain = host.split('.')[0] if '.' in host else None
+            if subdomain and subdomain not in ['www', 'localhost', '127']:
+                org_settings = db_session.query(OrganizationSettings)\
+                    .filter_by(subdomain=subdomain)\
+                    .first()
+
+            # Check URL path
+            if not org_settings and request.path.startswith('/org/'):
+                path_parts = request.path.split('/')
+                if len(path_parts) > 2:
+                    org_path = path_parts[2]
+                    org_settings = db_session.query(OrganizationSettings)\
+                        .filter_by(url_path=org_path)\
+                        .first()
+
+        return {'org_settings': org_settings}
+    except:
+        return {'org_settings': None}
     finally:
         db_session.close()
 
@@ -324,14 +385,22 @@ def upload():
 @app.route('/documents')
 @login_required
 def documents():
-    """Display list of uploaded documents"""
+    """Display list of uploaded documents (organization-wide for students/teachers)"""
     db_session = get_session(db_engine)
     try:
-        # Get all documents uploaded by the current user
-        user_documents = db_session.query(Document)\
-            .filter_by(uploaded_by=current_user.id)\
-            .order_by(Document.created_at.desc())\
-            .all()
+        # Students and teachers can see all documents in their organization
+        # This allows them to access study materials uploaded by teachers
+        if current_user.organization:
+            user_documents = db_session.query(Document)\
+                .filter_by(organization=current_user.organization)\
+                .order_by(Document.created_at.desc())\
+                .all()
+        else:
+            # Users without organization see only their own documents
+            user_documents = db_session.query(Document)\
+                .filter_by(uploaded_by=current_user.id)\
+                .order_by(Document.created_at.desc())\
+                .all()
 
         return render_template('documents.html', documents=user_documents)
     finally:
@@ -341,7 +410,7 @@ def documents():
 @app.route('/document/<int:document_id>')
 @login_required
 def view_document(document_id):
-    """View document content and details"""
+    """View document content and details (accessible to organization members)"""
     db_session = get_session(db_engine)
     try:
         # Get document and verify ownership
@@ -351,8 +420,15 @@ def view_document(document_id):
             flash('Document not found', 'error')
             return redirect(url_for('documents'))
 
-        # Check if user owns this document
-        if document.uploaded_by != current_user.id:
+        # Check if user has access to this document
+        # Users can access documents in their organization or their own documents
+        has_access = (
+            document.uploaded_by == current_user.id or
+            (current_user.organization and document.organization == current_user.organization) or
+            current_user.is_superadmin()
+        )
+
+        if not has_access:
             flash('You do not have permission to view this document', 'error')
             return redirect(url_for('documents'))
 
@@ -442,14 +518,29 @@ def generate_questions(document_id):
                 provider = current_user.ai_provider or 'gemini'
                 model = current_user.ai_model or 'gemini-2.5-flash'
 
-                # Generate mixed questions using user's preferred AI
+                # Get organization's API keys if available
+                openai_key = None
+                gemini_key = None
+
+                if current_user.organization:
+                    org_settings = db_session.query(OrganizationSettings)\
+                        .filter_by(organization_name=current_user.organization)\
+                        .first()
+
+                    if org_settings:
+                        openai_key = org_settings.openai_api_key
+                        gemini_key = org_settings.gemini_api_key
+
+                # Generate mixed questions using user's preferred AI with organization API keys
                 results = generate_questions_mixed(
                     text=document.content,
                     num_mcq=num_mcq,
                     num_true_false=num_true_false,
                     num_short_answer=num_short_answer,
                     model=model,
-                    provider=provider
+                    provider=provider,
+                    openai_api_key=openai_key,
+                    gemini_api_key=gemini_key
                 )
 
                 # Store generated questions in session for review
@@ -693,7 +784,7 @@ def save_questions():
 @app.route('/question-bank')
 @login_required
 def question_bank():
-    """Display all approved questions"""
+    """Display all approved questions (organization-wide)"""
     db_session = get_session(db_engine)
     try:
         # Get filter parameters
@@ -701,10 +792,17 @@ def question_bank():
         question_type = request.args.get('type')
         status = request.args.get('status', 'approved')
 
-        # Build query
-        query = db_session.query(Question).join(Document).filter(
-            Document.uploaded_by == current_user.id
-        )
+        # Build query - show all questions from organization's documents
+        if current_user.organization:
+            # Users with organization see all questions from their organization
+            query = db_session.query(Question).join(Document).filter(
+                Document.organization == current_user.organization
+            )
+        else:
+            # Users without organization see only their own questions
+            query = db_session.query(Question).join(Document).filter(
+                Document.uploaded_by == current_user.id
+            )
 
         if document_id:
             query = query.filter(Question.document_id == document_id)
@@ -717,10 +815,15 @@ def question_bank():
 
         questions = query.order_by(Question.created_at.desc()).all()
 
-        # Get user's documents for filter dropdown
-        documents = db_session.query(Document).filter_by(
-            uploaded_by=current_user.id
-        ).all()
+        # Get organization's documents for filter dropdown
+        if current_user.organization:
+            documents = db_session.query(Document).filter_by(
+                organization=current_user.organization
+            ).all()
+        else:
+            documents = db_session.query(Document).filter_by(
+                uploaded_by=current_user.id
+            ).all()
 
         # Count by type
         total_mcq = db_session.query(Question).join(Document).filter(
@@ -1182,35 +1285,176 @@ def results():
         db_session.close()
 
 
+@app.route('/analytics')
+@login_required
+def analytics():
+    """Analytics dashboard with exam history and statistics"""
+    db_session = get_session(db_engine)
+    try:
+        # Get all completed exams for current user
+        user_exams = db_session.query(Exam)\
+            .filter_by(user_id=current_user.id)\
+            .filter(Exam.completed_at.isnot(None))\
+            .order_by(Exam.completed_at.desc())\
+            .all()
+
+        # Calculate basic statistics
+        total_exams = len(user_exams)
+        avg_score = sum(exam.score for exam in user_exams) / total_exams if total_exams > 0 else 0
+
+        # Calculate total questions attempted
+        total_questions = sum(exam.total_questions for exam in user_exams)
+
+        # Get all exam questions for the user to calculate success rate by difficulty
+        exam_ids = [exam.id for exam in user_exams]
+        all_exam_questions = db_session.query(ExamQuestion)\
+            .filter(ExamQuestion.exam_id.in_(exam_ids))\
+            .all() if exam_ids else []
+
+        # Calculate success rate by difficulty
+        difficulty_stats = {'easy': {'correct': 0, 'total': 0},
+                           'medium': {'correct': 0, 'total': 0},
+                           'hard': {'correct': 0, 'total': 0}}
+
+        for eq in all_exam_questions:
+            difficulty = eq.question.difficulty
+            if difficulty in difficulty_stats:
+                difficulty_stats[difficulty]['total'] += 1
+                if eq.is_correct:
+                    difficulty_stats[difficulty]['correct'] += 1
+
+        # Calculate success rates
+        difficulty_rates = {}
+        for diff, stats in difficulty_stats.items():
+            if stats['total'] > 0:
+                difficulty_rates[diff] = {
+                    'rate': (stats['correct'] / stats['total']) * 100,
+                    'correct': stats['correct'],
+                    'total': stats['total']
+                }
+            else:
+                difficulty_rates[diff] = {'rate': 0, 'correct': 0, 'total': 0}
+
+        # Prepare data for Chart.js (last 10 exams in chronological order)
+        chart_exams = user_exams[:10][::-1]  # Reverse to get chronological order
+        chart_data = {
+            'labels': [exam.completed_at.strftime('%b %d') for exam in chart_exams],
+            'scores': [exam.score for exam in chart_exams]
+        }
+
+        return render_template('analytics.html',
+                             exams=user_exams,
+                             total_exams=total_exams,
+                             avg_score=avg_score,
+                             total_questions=total_questions,
+                             difficulty_rates=difficulty_rates,
+                             chart_data=chart_data)
+    finally:
+        db_session.close()
+
+
+@app.route('/analytics/export-csv')
+@login_required
+def export_analytics_csv():
+    """Export analytics data as CSV"""
+    import csv
+    from io import StringIO
+    from flask import make_response
+
+    db_session = get_session(db_engine)
+    try:
+        # Get all completed exams for current user
+        user_exams = db_session.query(Exam)\
+            .filter_by(user_id=current_user.id)\
+            .filter(Exam.completed_at.isnot(None))\
+            .order_by(Exam.completed_at.desc())\
+            .all()
+
+        # Create CSV
+        output = StringIO()
+        fieldnames = ['Exam ID', 'Date', 'Total Questions', 'Score (%)', 'Correct', 'Wrong', 'Duration (min)']
+        writer = csv.DictWriter(output, fieldnames=fieldnames)
+
+        writer.writeheader()
+        for exam in user_exams:
+            correct_count = sum(1 for eq in exam.exam_questions if eq.is_correct)
+            wrong_count = exam.total_questions - correct_count
+            duration = (exam.completed_at - exam.created_at).total_seconds() / 60 if exam.completed_at else 0
+
+            writer.writerow({
+                'Exam ID': exam.id,
+                'Date': exam.completed_at.strftime('%Y-%m-%d %H:%M:%S') if exam.completed_at else 'N/A',
+                'Total Questions': exam.total_questions,
+                'Score (%)': f'{exam.score:.2f}',
+                'Correct': correct_count,
+                'Wrong': wrong_count,
+                'Duration (min)': f'{duration:.1f}'
+            })
+
+        # Create response
+        response = make_response(output.getvalue())
+        response.headers['Content-Disposition'] = f'attachment; filename=exam_analytics_{datetime.now().strftime("%Y%m%d")}.csv'
+        response.headers['Content-Type'] = 'text/csv'
+
+        return response
+    finally:
+        db_session.close()
+
+
 @app.route('/admin')
 @admin_required
 def admin_dashboard():
     """Admin dashboard with comprehensive statistics and management tools"""
     db_session = get_session(db_engine)
     try:
+        # Check if user is superadmin or org admin
+        is_superadmin = current_user.is_superadmin()
+
+        # Build base queries with organization filter
+        if is_superadmin:
+            # Superadmin sees everything
+            users_query = db_session.query(User)
+            documents_query = db_session.query(Document)
+            questions_query = db_session.query(Question)
+            exams_query = db_session.query(Exam)
+        else:
+            # Org admin sees only their organization
+            users_query = db_session.query(User).filter_by(organization=current_user.organization)
+            documents_query = db_session.query(Document).filter_by(organization=current_user.organization)
+            questions_query = db_session.query(Question).join(Document).filter(
+                Document.organization == current_user.organization
+            )
+            exams_query = db_session.query(Exam).join(User).filter(
+                User.organization == current_user.organization
+            )
+
         # Get comprehensive statistics
-        total_users = db_session.query(User).count()
-        total_documents = db_session.query(Document).count()
-        total_questions = db_session.query(Question).count()
-        total_exams = db_session.query(Exam).count()
+        total_users = users_query.count()
+        total_documents = documents_query.count()
+        total_questions = questions_query.count()
+        total_exams = exams_query.count()
 
         # Count users by role
-        admin_count = db_session.query(User).filter_by(role='admin').count()
-        teacher_count = db_session.query(User).filter_by(role='teacher').count()
-        student_count = db_session.query(User).filter_by(role='student').count()
+        admin_count = users_query.filter_by(role='admin').count()
+        teacher_count = users_query.filter_by(role='teacher').count()
+        student_count = users_query.filter_by(role='student').count()
 
-        # Get unique organizations
-        organizations = db_session.query(User.organization).distinct().all()
-        organization_list = [org[0] for org in organizations if org[0]]
+        # Get unique organizations (superadmin only)
+        if is_superadmin:
+            organizations = db_session.query(User.organization).distinct().all()
+            organization_list = [org[0] for org in organizations if org[0]]
+            organization_count = len(organization_list)
+        else:
+            organization_count = 1  # Current organization only
 
         # Get recent users (last 5)
-        recent_users = db_session.query(User)\
+        recent_users = users_query\
             .order_by(User.created_at.desc())\
             .limit(5)\
             .all()
 
         # Get recent documents (last 5)
-        recent_documents = db_session.query(Document)\
+        recent_documents = documents_query\
             .order_by(Document.created_at.desc())\
             .limit(5)\
             .all()
@@ -1223,9 +1467,10 @@ def admin_dashboard():
                                admin_count=admin_count,
                                teacher_count=teacher_count,
                                student_count=student_count,
-                               organization_count=len(organization_list),
+                               organization_count=organization_count,
                                recent_users=recent_users,
-                               recent_documents=recent_documents)
+                               recent_documents=recent_documents,
+                               is_superadmin=is_superadmin)
     finally:
         db_session.close()
 
@@ -1233,13 +1478,22 @@ def admin_dashboard():
 @app.route('/admin/users')
 @admin_required
 def admin_users():
-    """View all users in the system"""
+    """View all users in the system (filtered by organization for org admins)"""
     db_session = get_session(db_engine)
     try:
-        # Get all users with document counts
-        users = db_session.query(User)\
-            .order_by(User.created_at.desc())\
-            .all()
+        # Check if user is superadmin or org admin
+        is_superadmin = current_user.is_superadmin()
+
+        # Build query with organization filter
+        if is_superadmin:
+            # Superadmin sees all users
+            users_query = db_session.query(User)
+        else:
+            # Org admin sees only their organization's users
+            users_query = db_session.query(User).filter_by(organization=current_user.organization)
+
+        # Get all users
+        users = users_query.order_by(User.created_at.desc()).all()
 
         # Add document count for each user
         for user in users:
@@ -1250,7 +1504,7 @@ def admin_users():
                 .filter_by(user_id=user.id)\
                 .count()
 
-        return render_template('admin_users.html', users=users)
+        return render_template('admin_users.html', users=users, is_superadmin=is_superadmin)
     finally:
         db_session.close()
 
@@ -1258,13 +1512,22 @@ def admin_users():
 @app.route('/admin/documents')
 @admin_required
 def admin_documents():
-    """View all documents in the system"""
+    """View all documents in the system (filtered by organization for org admins)"""
     db_session = get_session(db_engine)
     try:
+        # Check if user is superadmin or org admin
+        is_superadmin = current_user.is_superadmin()
+
+        # Build query with organization filter
+        if is_superadmin:
+            # Superadmin sees all documents
+            documents_query = db_session.query(Document)
+        else:
+            # Org admin sees only their organization's documents
+            documents_query = db_session.query(Document).filter_by(organization=current_user.organization)
+
         # Get all documents with uploader information
-        documents = db_session.query(Document)\
-            .order_by(Document.created_at.desc())\
-            .all()
+        documents = documents_query.order_by(Document.created_at.desc()).all()
 
         # Add question count for each document
         for doc in documents:
@@ -1272,7 +1535,7 @@ def admin_documents():
                 .filter_by(document_id=doc.id)\
                 .count()
 
-        return render_template('admin_documents.html', documents=documents)
+        return render_template('admin_documents.html', documents=documents, is_superadmin=is_superadmin)
     finally:
         db_session.close()
 
@@ -1280,10 +1543,13 @@ def admin_documents():
 @app.route('/admin/user/<int:user_id>/role', methods=['POST'])
 @admin_required
 def admin_change_role(user_id):
-    """Change a user's role"""
+    """Change a user's role (org admins can only change roles within their organization)"""
     new_role = request.form.get('role')
 
-    if new_role not in ['student', 'teacher', 'admin']:
+    # Superadmins can create superadmins, org admins cannot
+    allowed_roles = ['student', 'teacher', 'admin', 'superadmin'] if current_user.is_superadmin() else ['student', 'teacher', 'admin']
+
+    if new_role not in allowed_roles:
         flash('Invalid role specified', 'error')
         return redirect(url_for('admin_users'))
 
@@ -1295,9 +1561,20 @@ def admin_change_role(user_id):
             flash('User not found', 'error')
             return redirect(url_for('admin_users'))
 
+        # Org admins can only modify users in their organization
+        if not current_user.is_superadmin():
+            if user.organization != current_user.organization:
+                flash('You can only modify users in your organization', 'error')
+                return redirect(url_for('admin_users'))
+
         # Prevent changing your own role
         if user.id == current_user.id:
             flash('You cannot change your own role', 'error')
+            return redirect(url_for('admin_users'))
+
+        # Org admins cannot modify superadmins
+        if user.is_superadmin() and not current_user.is_superadmin():
+            flash('You do not have permission to modify this user', 'error')
             return redirect(url_for('admin_users'))
 
         old_role = user.role
@@ -1445,33 +1722,259 @@ def teacher_dashboard():
 
 @app.route('/settings', methods=['GET', 'POST'])
 @login_required
-@role_required('teacher', 'admin')
+@role_required('teacher', 'admin', 'superadmin')
 def settings():
-    """AI Settings page for teachers and admins"""
-    if request.method == 'POST':
-        provider = request.form.get('ai_provider')
-        model = request.form.get('ai_model')
+    """AI Settings page for teachers and admins - includes API key management for admins"""
+    db_session = get_session(db_engine)
+    try:
+        is_superadmin = current_user.is_superadmin()
+        is_admin = current_user.role in ['admin', 'superadmin']
 
-        if not provider or not model:
-            flash('Please select both AI provider and model', 'error')
-            return redirect(url_for('settings'))
+        # For superadmin, allow selecting which organization to manage
+        target_org = None
+        org_settings = None
+        all_orgs = []
 
-        db_session = get_session(db_engine)
-        try:
-            current_user.ai_provider = provider
-            current_user.ai_model = model
-            db_session.add(current_user)
+        if is_admin:
+            if is_superadmin:
+                target_org = request.args.get('org') or request.form.get('selected_organization')
+                if not target_org:
+                    # Show org selector for superadmin
+                    all_orgs = db_session.query(OrganizationSettings).all()
+                    return render_template('settings.html',
+                                         ai_models=AI_MODELS,
+                                         is_superadmin=is_superadmin,
+                                         is_admin=is_admin,
+                                         all_organizations=all_orgs,
+                                         show_org_selector=True)
+            else:
+                # Org admin can only manage their own organization
+                target_org = current_user.organization
+                if not target_org:
+                    flash('You must be part of an organization to manage API keys', 'error')
+                    return redirect(url_for('admin_dashboard'))
+
+            # Get organization settings for target org
+            org_settings = db_session.query(OrganizationSettings)\
+                .filter_by(organization_name=target_org)\
+                .first()
+
+            # Get all orgs for superadmin dropdown
+            if is_superadmin:
+                all_orgs = db_session.query(OrganizationSettings).all()
+
+        if request.method == 'POST':
+            # Handle user AI preferences (teachers and admins)
+            provider = request.form.get('ai_provider')
+            model = request.form.get('ai_model')
+
+            if provider and model:
+                current_user.ai_provider = provider
+                current_user.ai_model = model
+                db_session.add(current_user)
+                flash(f'AI preferences updated! Now using {AI_MODELS.get(provider, {}).get(model, model)}', 'success')
+
+            # Handle organization API keys (admins only)
+            if is_admin and target_org:
+                # Create org settings if it doesn't exist
+                if not org_settings:
+                    org_settings = OrganizationSettings(
+                        organization_name=target_org,
+                        display_name=target_org
+                    )
+                    db_session.add(org_settings)
+                    db_session.flush()
+
+                # Update API Keys
+                openai_key = request.form.get('openai_api_key', '').strip()
+                gemini_key = request.form.get('gemini_api_key', '').strip()
+
+                if openai_key:
+                    org_settings.openai_api_key = openai_key
+                    flash('OpenAI API key updated successfully!', 'success')
+
+                if gemini_key:
+                    org_settings.gemini_api_key = gemini_key
+                    flash('Gemini API key updated successfully!', 'success')
+
             db_session.commit()
-            flash(f'AI settings updated! Now using {AI_MODELS.get(provider, {}).get(model, model)}', 'success')
-        except Exception as e:
-            db_session.rollback()
-            flash(f'Error updating settings: {str(e)}', 'error')
-        finally:
-            db_session.close()
 
+            # Redirect back with org parameter for superadmin
+            if is_superadmin and target_org:
+                return redirect(url_for('settings', org=target_org))
+            else:
+                return redirect(url_for('settings'))
+
+        return render_template('settings.html',
+                             ai_models=AI_MODELS,
+                             is_superadmin=is_superadmin,
+                             is_admin=is_admin,
+                             org_settings=org_settings,
+                             all_organizations=all_orgs,
+                             target_org=target_org)
+    except Exception as e:
+        db_session.rollback()
+        flash(f'Error updating settings: {str(e)}', 'error')
         return redirect(url_for('settings'))
+    finally:
+        db_session.close()
 
-    return render_template('settings.html', ai_models=AI_MODELS)
+
+@app.route('/members')
+@login_required
+def organization_members():
+    """View all members in the user's organization"""
+    if not current_user.organization:
+        flash('You are not part of an organization', 'warning')
+        return redirect(url_for('index'))
+
+    db_session = get_session(db_engine)
+    try:
+        # Get all users in the same organization
+        members = db_session.query(User)\
+            .filter_by(organization=current_user.organization)\
+            .order_by(User.role.desc(), User.name)\
+            .all()
+
+        # Group by role
+        admins = [u for u in members if u.role == 'admin']
+        teachers = [u for u in members if u.role == 'teacher']
+        students = [u for u in members if u.role == 'student']
+
+        # Get statistics for each member
+        for member in members:
+            member.document_count = db_session.query(Document)\
+                .filter_by(uploaded_by=member.id)\
+                .count()
+            member.exam_count = db_session.query(Exam)\
+                .filter_by(user_id=member.id)\
+                .filter(Exam.completed_at.isnot(None))\
+                .count()
+
+        return render_template('organization_members.html',
+                             admins=admins,
+                             teachers=teachers,
+                             students=students,
+                             total_members=len(members),
+                             organization_name=current_user.organization)
+    finally:
+        db_session.close()
+
+
+@app.route('/organization-settings', methods=['GET', 'POST'])
+@login_required
+@role_required('admin', 'superadmin')
+def organization_settings():
+    """Organization branding and white-label settings (admin and superadmin)"""
+    db_session = get_session(db_engine)
+    try:
+        is_superadmin = current_user.is_superadmin()
+
+        # For superadmin, allow selecting which organization to manage
+        target_org = None
+        if is_superadmin:
+            target_org = request.args.get('org') or request.form.get('selected_organization')
+            if not target_org:
+                # If no org specified, show org selector
+                all_orgs = db_session.query(OrganizationSettings).all()
+                return render_template('organization_settings.html',
+                                     org_settings=None,
+                                     is_superadmin=is_superadmin,
+                                     all_organizations=all_orgs,
+                                     show_org_selector=True)
+        else:
+            # Org admin can only manage their own organization
+            target_org = current_user.organization
+            if not target_org:
+                flash('You must be part of an organization to access settings', 'error')
+                return redirect(url_for('admin_dashboard'))
+
+        # Get or create organization settings for target org
+        org_settings = db_session.query(OrganizationSettings)\
+            .filter_by(organization_name=target_org)\
+            .first()
+
+        # Get all organizations for superadmin dropdown
+        all_orgs = db_session.query(OrganizationSettings).all() if is_superadmin else []
+
+        if request.method == 'POST':
+            # Get or create org settings for target organization
+            if not org_settings:
+                org_settings = OrganizationSettings(
+                    organization_name=target_org,
+                    display_name=target_org
+                )
+                db_session.add(org_settings)
+                db_session.flush()
+
+            # Update basic settings
+            org_settings.display_name = request.form.get('display_name', org_settings.display_name)
+            org_settings.subdomain = request.form.get('subdomain') or None
+            org_settings.url_path = request.form.get('url_path') or None
+
+            # Update colors
+            org_settings.primary_color = request.form.get('primary_color', org_settings.primary_color)
+            org_settings.secondary_color = request.form.get('secondary_color', org_settings.secondary_color)
+            org_settings.success_color = request.form.get('success_color', org_settings.success_color)
+            org_settings.danger_color = request.form.get('danger_color', org_settings.danger_color)
+
+            # Update custom CSS
+            org_settings.custom_css = request.form.get('custom_css') or None
+            org_settings.custom_footer_html = request.form.get('custom_footer_html') or None
+
+            # Update features
+            org_settings.enable_analytics = 'enable_analytics' in request.form
+            org_settings.enable_csv_export = 'enable_csv_export' in request.form
+            org_settings.enable_pdf_export = 'enable_pdf_export' in request.form
+
+            # Update contact info
+            org_settings.contact_email = request.form.get('contact_email') or None
+            org_settings.support_url = request.form.get('support_url') or None
+
+            # Handle logo upload
+            if 'logo' in request.files:
+                logo_file = request.files['logo']
+                if logo_file and logo_file.filename:
+                    # Validate file type
+                    allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'svg'}
+                    file_ext = logo_file.filename.rsplit('.', 1)[1].lower()
+                    if file_ext in allowed_extensions:
+                        # Generate unique filename
+                        logo_filename = f"logo_{target_org}_{datetime.now().strftime('%Y%m%d%H%M%S')}.{file_ext}"
+                        logo_path = os.path.join('static', 'logos', logo_filename)
+
+                        # Remove old logo if exists
+                        if org_settings.logo_filename:
+                            old_logo_path = os.path.join('static', 'logos', org_settings.logo_filename)
+                            if os.path.exists(old_logo_path):
+                                os.remove(old_logo_path)
+
+                        # Save new logo
+                        logo_file.save(logo_path)
+                        org_settings.logo_filename = logo_filename
+                    else:
+                        flash('Invalid logo file type. Allowed: PNG, JPG, JPEG, GIF, SVG', 'warning')
+
+            db_session.commit()
+            flash('Organization settings updated successfully!', 'success')
+
+            # Redirect back to org settings with org parameter for superadmin
+            if is_superadmin:
+                return redirect(url_for('organization_settings', org=target_org))
+            else:
+                return redirect(url_for('organization_settings'))
+
+        return render_template('organization_settings.html',
+                             org_settings=org_settings,
+                             is_superadmin=is_superadmin,
+                             all_organizations=all_orgs,
+                             target_org=target_org)
+    except Exception as e:
+        db_session.rollback()
+        flash(f'Error updating organization settings: {str(e)}', 'error')
+        return redirect(url_for('organization_settings'))
+    finally:
+        db_session.close()
 
 
 @app.route('/upload-csv-questions', methods=['GET', 'POST'])
@@ -1692,6 +2195,46 @@ def download_sample_csv():
 
 
 # Error handlers
+@app.route('/debug-user')
+@login_required
+def debug_user():
+    """Debug route to check current user's status"""
+    db_session = get_session(db_engine)
+    try:
+        user_info = {
+            'email': current_user.email,
+            'name': current_user.name,
+            'role': current_user.role,
+            'organization': current_user.organization,
+            'is_superadmin': current_user.is_superadmin(),
+            'is_org_admin': current_user.is_org_admin(),
+            'is_authenticated': current_user.is_authenticated
+        }
+
+        # Get org settings if available
+        org_settings = None
+        if current_user.organization:
+            org_settings = db_session.query(OrganizationSettings)\
+                .filter_by(organization_name=current_user.organization)\
+                .first()
+
+        org_info = None
+        if org_settings:
+            org_info = {
+                'display_name': org_settings.display_name,
+                'has_openai_key': org_settings.has_openai_key(),
+                'has_gemini_key': org_settings.has_gemini_key()
+            }
+
+        return jsonify({
+            'user': user_info,
+            'organization': org_info,
+            'message': 'If is_superadmin is True, you should see superadmin UI in /admin'
+        })
+    finally:
+        db_session.close()
+
+
 @app.errorhandler(403)
 def forbidden(e):
     """Handle 403 Forbidden errors"""

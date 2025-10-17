@@ -17,7 +17,7 @@ class User(Base, UserMixin):
     password_hash = Column(String(255), nullable=False)
     name = Column(String(255), nullable=False)
     organization = Column(String(255), nullable=True)
-    role = Column(String(50), default='student')  # student, teacher, admin
+    role = Column(String(50), default='student')  # student, teacher, admin, superadmin
     remember_token = Column(String(255), nullable=True)  # For remember me functionality
 
     # AI Settings (for teachers and admins)
@@ -37,6 +37,14 @@ class User(Base, UserMixin):
     def check_password(self, password):
         """Verify the user's password"""
         return check_password_hash(self.password_hash, password)
+
+    def is_superadmin(self):
+        """Check if user is a superadmin"""
+        return self.role == 'superadmin' or self.email == 'admin@example.com'
+
+    def is_org_admin(self):
+        """Check if user is an organization admin (but not superadmin)"""
+        return self.role == 'admin' and not self.is_superadmin()
 
     def __repr__(self):
         return f'<User {self.email}>'
@@ -146,6 +154,121 @@ class ExamQuestion(Base):
 
     def __repr__(self):
         return f'<ExamQuestion {self.id} - Exam {self.exam_id} - Question {self.question_id}>'
+
+
+class OrganizationSettings(Base):
+    """Organization white-label settings for customization"""
+    __tablename__ = 'organization_settings'
+
+    id = Column(Integer, primary_key=True)
+    organization_name = Column(String(255), unique=True, nullable=False, index=True)
+    display_name = Column(String(255), nullable=False)  # Display name for branding
+    subdomain = Column(String(100), unique=True, nullable=True, index=True)  # Optional subdomain
+    url_path = Column(String(100), unique=True, nullable=True, index=True)  # Optional URL path like /org-name
+
+    # Branding
+    logo_filename = Column(String(255), nullable=True)  # Uploaded logo file
+    favicon_filename = Column(String(255), nullable=True)  # Custom favicon
+
+    # Color Scheme
+    primary_color = Column(String(7), default='#0d6efd')  # Hex color for primary brand color
+    secondary_color = Column(String(7), default='#6c757d')  # Hex color for secondary color
+    success_color = Column(String(7), default='#198754')  # Success/positive actions
+    danger_color = Column(String(7), default='#dc3545')  # Danger/negative actions
+
+    # Custom Styling
+    custom_css = Column(Text, nullable=True)  # Custom CSS injection
+    custom_footer_html = Column(Text, nullable=True)  # Custom footer content
+
+    # Features
+    enable_analytics = Column(Boolean, default=True)
+    enable_csv_export = Column(Boolean, default=True)
+    enable_pdf_export = Column(Boolean, default=True)
+
+    # Contact Info
+    contact_email = Column(String(255), nullable=True)
+    support_url = Column(String(500), nullable=True)
+
+    # API Keys (stored securely, encrypted at rest recommended for production)
+    openai_api_key = Column(String(500), nullable=True)  # Organization's OpenAI API key
+    gemini_api_key = Column(String(500), nullable=True)  # Organization's Gemini API key
+
+    # Metadata
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    def __repr__(self):
+        return f'<OrganizationSettings {self.organization_name}>'
+
+    def get_masked_openai_key(self):
+        """Get masked OpenAI API key for display (shows last 4 characters only)"""
+        if not self.openai_api_key:
+            return None
+        if len(self.openai_api_key) <= 4:
+            return '****'
+        return '*' * (len(self.openai_api_key) - 4) + self.openai_api_key[-4:]
+
+    def get_masked_gemini_key(self):
+        """Get masked Gemini API key for display (shows last 4 characters only)"""
+        if not self.gemini_api_key:
+            return None
+        if len(self.gemini_api_key) <= 4:
+            return '****'
+        return '*' * (len(self.gemini_api_key) - 4) + self.gemini_api_key[-4:]
+
+    def has_openai_key(self):
+        """Check if OpenAI API key is configured"""
+        return self.openai_api_key is not None and len(self.openai_api_key) > 0
+
+    def has_gemini_key(self):
+        """Check if Gemini API key is configured"""
+        return self.gemini_api_key is not None and len(self.gemini_api_key) > 0
+
+    def get_logo_url(self):
+        """Get the URL for the organization logo"""
+        if self.logo_filename:
+            return f'/static/logos/{self.logo_filename}'
+        return None
+
+    def get_theme_css(self):
+        """Generate CSS for the organization theme"""
+        return f"""
+        :root {{
+            --bs-primary: {self.primary_color};
+            --bs-primary-rgb: {self._hex_to_rgb(self.primary_color)};
+            --bs-secondary: {self.secondary_color};
+            --bs-secondary-rgb: {self._hex_to_rgb(self.secondary_color)};
+            --bs-success: {self.success_color};
+            --bs-success-rgb: {self._hex_to_rgb(self.success_color)};
+            --bs-danger: {self.danger_color};
+            --bs-danger-rgb: {self._hex_to_rgb(self.danger_color)};
+        }}
+        .navbar {{
+            background-color: {self.primary_color} !important;
+        }}
+        .btn-primary {{
+            background-color: {self.primary_color};
+            border-color: {self.primary_color};
+        }}
+        .btn-primary:hover {{
+            background-color: {self._darken_color(self.primary_color, 10)};
+            border-color: {self._darken_color(self.primary_color, 10)};
+        }}
+        """
+
+    @staticmethod
+    def _hex_to_rgb(hex_color):
+        """Convert hex color to RGB string"""
+        hex_color = hex_color.lstrip('#')
+        return ', '.join(str(int(hex_color[i:i+2], 16)) for i in (0, 2, 4))
+
+    @staticmethod
+    def _darken_color(hex_color, percent):
+        """Darken a hex color by a percentage"""
+        hex_color = hex_color.lstrip('#')
+        rgb = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+        darker = tuple(int(c * (1 - percent / 100)) for c in rgb)
+        return f"#{darker[0]:02x}{darker[1]:02x}{darker[2]:02x}"
 
 
 # Database initialization helper

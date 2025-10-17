@@ -133,6 +133,48 @@ def migrate_database():
             print(f"  ⚠ Could not fix options_json constraint: {e}")
             print("  This might not be an issue if your schema is already correct.")
 
+        # Create organization_settings table
+        print("\nChecking organization_settings table...")
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='organization_settings'")
+        table_exists = cursor.fetchone()
+
+        if not table_exists:
+            print("  Creating organization_settings table...")
+            cursor.execute("""
+                CREATE TABLE organization_settings (
+                    id INTEGER PRIMARY KEY,
+                    organization_name VARCHAR(255) UNIQUE NOT NULL,
+                    display_name VARCHAR(255) NOT NULL,
+                    subdomain VARCHAR(100) UNIQUE,
+                    url_path VARCHAR(100) UNIQUE,
+                    logo_filename VARCHAR(255),
+                    favicon_filename VARCHAR(255),
+                    primary_color VARCHAR(7) DEFAULT '#0d6efd',
+                    secondary_color VARCHAR(7) DEFAULT '#6c757d',
+                    success_color VARCHAR(7) DEFAULT '#198754',
+                    danger_color VARCHAR(7) DEFAULT '#dc3545',
+                    custom_css TEXT,
+                    custom_footer_html TEXT,
+                    enable_analytics BOOLEAN DEFAULT 1,
+                    enable_csv_export BOOLEAN DEFAULT 1,
+                    enable_pdf_export BOOLEAN DEFAULT 1,
+                    contact_email VARCHAR(255),
+                    support_url VARCHAR(500),
+                    created_at DATETIME NOT NULL,
+                    updated_at DATETIME NOT NULL
+                )
+            """)
+
+            # Create indexes
+            cursor.execute("CREATE INDEX idx_organization_name ON organization_settings(organization_name)")
+            cursor.execute("CREATE INDEX idx_subdomain ON organization_settings(subdomain)")
+            cursor.execute("CREATE INDEX idx_url_path ON organization_settings(url_path)")
+
+            conn.commit()
+            print("  ✓ organization_settings table created")
+        else:
+            print("  ✓ organization_settings table already exists")
+
         conn.close()
         print("\n✅ Database migration complete!")
         return True

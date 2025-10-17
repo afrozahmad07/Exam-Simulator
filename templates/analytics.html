@@ -1,0 +1,358 @@
+{% extends "base.html" %}
+
+{% block title %}Analytics - Exam Simulator{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stat-card {
+        border-radius: 10px;
+        transition: transform 0.2s;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+    }
+    .difficulty-badge {
+        font-size: 0.9rem;
+        padding: 0.35rem 0.8rem;
+    }
+    .progress {
+        height: 25px;
+        font-size: 0.9rem;
+    }
+    .table-hover tbody tr:hover {
+        background-color: #f8f9fa;
+    }
+    .chart-container {
+        position: relative;
+        height: 300px;
+        margin-bottom: 20px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="display-5 fw-bold">
+                <i class="bi bi-graph-up text-primary"></i>
+                Analytics Dashboard
+            </h1>
+            <p class="text-muted">Track your progress and performance</p>
+        </div>
+        <a href="{{ url_for('export_analytics_csv') }}" class="btn btn-success">
+            <i class="bi bi-file-earmark-spreadsheet me-2"></i>Export CSV
+        </a>
+    </div>
+
+    {% if total_exams == 0 %}
+    <!-- No Data State -->
+    <div class="alert alert-info text-center py-5">
+        <i class="bi bi-info-circle display-1 mb-3"></i>
+        <h4>No exam data yet</h4>
+        <p class="text-muted">Take your first exam to see analytics here!</p>
+        <a href="{{ url_for('exam') }}" class="btn btn-primary mt-3">
+            <i class="bi bi-pencil-square me-2"></i>Take Exam
+        </a>
+    </div>
+    {% else %}
+
+    <!-- Statistics Cards -->
+    <div class="row g-4 mb-4">
+        <!-- Total Exams -->
+        <div class="col-md-3">
+            <div class="card stat-card shadow-sm border-0 bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h6 class="text-white-50 mb-2">Total Exams</h6>
+                            <h2 class="fw-bold mb-0">{{ total_exams }}</h2>
+                        </div>
+                        <div class="bg-white bg-opacity-25 rounded-circle p-3">
+                            <i class="bi bi-clipboard-check fs-3"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Average Score -->
+        <div class="col-md-3">
+            <div class="card stat-card shadow-sm border-0 bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h6 class="text-white-50 mb-2">Average Score</h6>
+                            <h2 class="fw-bold mb-0">{{ "%.1f"|format(avg_score) }}%</h2>
+                        </div>
+                        <div class="bg-white bg-opacity-25 rounded-circle p-3">
+                            <i class="bi bi-trophy fs-3"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Total Questions -->
+        <div class="col-md-3">
+            <div class="card stat-card shadow-sm border-0 bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h6 class="text-white-50 mb-2">Questions Attempted</h6>
+                            <h2 class="fw-bold mb-0">{{ total_questions }}</h2>
+                        </div>
+                        <div class="bg-white bg-opacity-25 rounded-circle p-3">
+                            <i class="bi bi-question-circle fs-3"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Best Score -->
+        <div class="col-md-3">
+            <div class="card stat-card shadow-sm border-0 bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h6 class="text-white-50 mb-2">Best Score</h6>
+                            <h2 class="fw-bold mb-0">{{ "%.1f"|format(exams[0].score if exams else 0) }}%</h2>
+                        </div>
+                        <div class="bg-white bg-opacity-25 rounded-circle p-3">
+                            <i class="bi bi-star-fill fs-3"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Success Rate by Difficulty -->
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-header bg-white py-3">
+            <h5 class="mb-0">
+                <i class="bi bi-speedometer2 text-primary me-2"></i>
+                Success Rate by Difficulty
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <!-- Easy -->
+                <div class="col-md-4">
+                    <div class="p-3 bg-light rounded">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="badge bg-success difficulty-badge">Easy</span>
+                            <strong>{{ "%.1f"|format(difficulty_rates.easy.rate) }}%</strong>
+                        </div>
+                        <div class="progress">
+                            <div class="progress-bar bg-success" role="progressbar"
+                                 style="width: {{ difficulty_rates.easy.rate }}%"
+                                 aria-valuenow="{{ difficulty_rates.easy.rate }}"
+                                 aria-valuemin="0" aria-valuemax="100">
+                                {{ difficulty_rates.easy.correct }}/{{ difficulty_rates.easy.total }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Medium -->
+                <div class="col-md-4">
+                    <div class="p-3 bg-light rounded">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="badge bg-warning difficulty-badge">Medium</span>
+                            <strong>{{ "%.1f"|format(difficulty_rates.medium.rate) }}%</strong>
+                        </div>
+                        <div class="progress">
+                            <div class="progress-bar bg-warning" role="progressbar"
+                                 style="width: {{ difficulty_rates.medium.rate }}%"
+                                 aria-valuenow="{{ difficulty_rates.medium.rate }}"
+                                 aria-valuemin="0" aria-valuemax="100">
+                                {{ difficulty_rates.medium.correct }}/{{ difficulty_rates.medium.total }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Hard -->
+                <div class="col-md-4">
+                    <div class="p-3 bg-light rounded">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="badge bg-danger difficulty-badge">Hard</span>
+                            <strong>{{ "%.1f"|format(difficulty_rates.hard.rate) }}%</strong>
+                        </div>
+                        <div class="progress">
+                            <div class="progress-bar bg-danger" role="progressbar"
+                                 style="width: {{ difficulty_rates.hard.rate }}%"
+                                 aria-valuenow="{{ difficulty_rates.hard.rate }}"
+                                 aria-valuemin="0" aria-valuemax="100">
+                                {{ difficulty_rates.hard.correct }}/{{ difficulty_rates.hard.total }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Progress Chart -->
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-header bg-white py-3">
+            <h5 class="mb-0">
+                <i class="bi bi-graph-up text-primary me-2"></i>
+                Progress Chart (Last 10 Exams)
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="chart-container">
+                <canvas id="progressChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Exam History Table -->
+    <div class="card shadow-sm border-0">
+        <div class="card-header bg-white py-3">
+            <h5 class="mb-0">
+                <i class="bi bi-table text-primary me-2"></i>
+                Exam History
+            </h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="px-4">Exam ID</th>
+                            <th>Date</th>
+                            <th>Questions</th>
+                            <th>Score</th>
+                            <th>Correct</th>
+                            <th>Wrong</th>
+                            <th>Duration</th>
+                            <th class="text-end px-4">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for exam in exams %}
+                        <tr>
+                            <td class="px-4">
+                                <strong class="text-primary">#{{ exam.id }}</strong>
+                            </td>
+                            <td>
+                                <small>{{ exam.completed_at.strftime('%Y-%m-%d %H:%M') if exam.completed_at else 'N/A' }}</small>
+                            </td>
+                            <td>
+                                <span class="badge bg-info">{{ exam.total_questions }}</span>
+                            </td>
+                            <td>
+                                {% set score = exam.score %}
+                                {% if score >= 80 %}
+                                    <span class="badge bg-success">{{ "%.1f"|format(score) }}%</span>
+                                {% elif score >= 60 %}
+                                    <span class="badge bg-warning">{{ "%.1f"|format(score) }}%</span>
+                                {% else %}
+                                    <span class="badge bg-danger">{{ "%.1f"|format(score) }}%</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="text-success fw-bold">
+                                    {{ exam.exam_questions|selectattr('is_correct')|list|length }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="text-danger fw-bold">
+                                    {{ exam.total_questions - exam.exam_questions|selectattr('is_correct')|list|length }}
+                                </span>
+                            </td>
+                            <td>
+                                {% set duration = (exam.completed_at - exam.created_at).total_seconds() / 60 if exam.completed_at else 0 %}
+                                <small class="text-muted">{{ "%.1f"|format(duration) }} min</small>
+                            </td>
+                            <td class="text-end px-4">
+                                <a href="{{ url_for('exam_results', exam_id=exam.id) }}"
+                                   class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-eye me-1"></i>View
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+{% if total_exams > 0 %}
+<script>
+    // Progress Chart
+    const ctx = document.getElementById('progressChart').getContext('2d');
+    const progressChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: {{ chart_data.labels|tojson }},
+            datasets: [{
+                label: 'Score (%)',
+                data: {{ chart_data.scores|tojson }},
+                borderColor: 'rgb(13, 110, 253)',
+                backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                tension: 0.4,
+                fill: true,
+                pointRadius: 5,
+                pointHoverRadius: 7,
+                pointBackgroundColor: 'rgb(13, 110, 253)',
+                pointBorderColor: '#fff',
+                pointBorderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top'
+                },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                    callbacks: {
+                        label: function(context) {
+                            return 'Score: ' + context.parsed.y.toFixed(1) + '%';
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    ticks: {
+                        callback: function(value) {
+                            return value + '%';
+                        }
+                    },
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.05)'
+                    }
+                },
+                x: {
+                    grid: {
+                        display: false
+                    }
+                }
+            }
+        }
+    });
+</script>
+{% endif %}
+{% endblock %}

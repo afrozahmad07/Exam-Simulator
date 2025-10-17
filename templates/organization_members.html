@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+
+{% block title %}Organization Members{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="display-5 mb-2">
+                        <i class="bi bi-people-fill text-primary"></i> Organization Members
+                    </h1>
+                    <p class="lead text-muted">{{ organization_name }} - {{ total_members }} members</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-md-4 mb-3">
+            <div class="card text-center border-primary">
+                <div class="card-body">
+                    <i class="bi bi-shield-fill-check text-primary" style="font-size: 2rem;"></i>
+                    <h3 class="mt-2">{{ admins|length }}</h3>
+                    <p class="text-muted mb-0">Administrators</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="card text-center border-success">
+                <div class="card-body">
+                    <i class="bi bi-person-badge-fill text-success" style="font-size: 2rem;"></i>
+                    <h3 class="mt-2">{{ teachers|length }}</h3>
+                    <p class="text-muted mb-0">Teachers</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="card text-center border-info">
+                <div class="card-body">
+                    <i class="bi bi-mortarboard-fill text-info" style="font-size: 2rem;"></i>
+                    <h3 class="mt-2">{{ students|length }}</h3>
+                    <p class="text-muted mb-0">Students</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Administrators Section -->
+    {% if admins %}
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <i class="bi bi-shield-fill-check me-2"></i>Administrators ({{ admins|length }})
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for admin in admins %}
+                        <div class="col-md-6 mb-3">
+                            <div class="card border-primary">
+                                <div class="card-body">
+                                    <div class="d-flex align-items-center">
+                                        <div class="me-3">
+                                            <i class="bi bi-person-circle text-primary" style="font-size: 3rem;"></i>
+                                        </div>
+                                        <div class="flex-grow-1">
+                                            <h5 class="mb-1">{{ admin.name }}</h5>
+                                            <p class="text-muted mb-1">
+                                                <i class="bi bi-envelope-fill me-1"></i>{{ admin.email }}
+                                            </p>
+                                            <div class="d-flex gap-2">
+                                                <span class="badge bg-primary">
+                                                    <i class="bi bi-file-earmark-text me-1"></i>{{ admin.document_count }} docs
+                                                </span>
+                                                <span class="badge bg-secondary">
+                                                    <i class="bi bi-clipboard-check me-1"></i>{{ admin.exam_count }} exams
+                                                </span>
+                                            </div>
+                                            <small class="text-muted">
+                                                <i class="bi bi-calendar-event me-1"></i>Joined {{ admin.created_at.strftime('%b %d, %Y') }}
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Teachers Section -->
+    {% if teachers %}
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <i class="bi bi-person-badge-fill me-2"></i>Teachers ({{ teachers|length }})
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for teacher in teachers %}
+                        <div class="col-md-6 mb-3">
+                            <div class="card border-success">
+                                <div class="card-body">
+                                    <div class="d-flex align-items-center">
+                                        <div class="me-3">
+                                            <i class="bi bi-person-circle text-success" style="font-size: 3rem;"></i>
+                                        </div>
+                                        <div class="flex-grow-1">
+                                            <h5 class="mb-1">{{ teacher.name }}</h5>
+                                            <p class="text-muted mb-1">
+                                                <i class="bi bi-envelope-fill me-1"></i>{{ teacher.email }}
+                                            </p>
+                                            <div class="d-flex gap-2">
+                                                <span class="badge bg-success">
+                                                    <i class="bi bi-file-earmark-text me-1"></i>{{ teacher.document_count }} docs
+                                                </span>
+                                                <span class="badge bg-secondary">
+                                                    <i class="bi bi-clipboard-check me-1"></i>{{ teacher.exam_count }} exams
+                                                </span>
+                                            </div>
+                                            <small class="text-muted">
+                                                <i class="bi bi-calendar-event me-1"></i>Joined {{ teacher.created_at.strftime('%b %d, %Y') }}
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Students Section -->
+    {% if students %}
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <i class="bi bi-mortarboard-fill me-2"></i>Students ({{ students|length }})
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for student in students %}
+                        <div class="col-md-6 mb-3">
+                            <div class="card border-info">
+                                <div class="card-body">
+                                    <div class="d-flex align-items-center">
+                                        <div class="me-3">
+                                            <i class="bi bi-person-circle text-info" style="font-size: 3rem;"></i>
+                                        </div>
+                                        <div class="flex-grow-1">
+                                            <h5 class="mb-1">{{ student.name }}</h5>
+                                            <p class="text-muted mb-1">
+                                                <i class="bi bi-envelope-fill me-1"></i>{{ student.email }}
+                                            </p>
+                                            <div class="d-flex gap-2">
+                                                <span class="badge bg-info">
+                                                    <i class="bi bi-file-earmark-text me-1"></i>{{ student.document_count }} docs
+                                                </span>
+                                                <span class="badge bg-secondary">
+                                                    <i class="bi bi-clipboard-check me-1"></i>{{ student.exam_count }} exams
+                                                </span>
+                                            </div>
+                                            <small class="text-muted">
+                                                <i class="bi bi-calendar-event me-1"></i>Joined {{ student.created_at.strftime('%b %d, %Y') }}
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Empty State -->
+    {% if total_members == 1 %}
+    <div class="row">
+        <div class="col-md-12">
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle me-2"></i>You are currently the only member of this organization. Invite more members to collaborate!
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
