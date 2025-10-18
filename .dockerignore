@@ -1,0 +1,70 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Environment files
+.env
+.env.*
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Uploads (will be mounted as volume in production)
+uploads/*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Documentation
+*.md
+!README.md
+
+# Deployment configs (not needed in container)
+apache-virtualmin-config.conf
+nginx-virtualmin-config.conf
+setup-systemd.sh
+deploy.sh
+update-from-github.sh
+requirements-production.txt
+
+# Test files
+test_*.py
+
+# Sample files
+generate_sample_pdf.py
+demo_data.py
