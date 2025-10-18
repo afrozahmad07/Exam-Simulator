@@ -1,0 +1,36 @@
+# Production Dependencies for Flask Exam Simulator
+
+# Core Flask Framework
+Flask==3.0.0
+Werkzeug==3.0.1
+
+# Database
+SQLAlchemy==2.0.23
+
+# Authentication
+Flask-Login==0.6.3
+
+# AI Integration
+openai==1.6.1
+google-generativeai==0.3.1
+
+# Document Processing
+PyPDF2==3.0.1
+python-docx==1.1.0
+
+# Environment Management
+python-dotenv==1.0.0
+
+# PDF Generation
+xhtml2pdf==0.2.13
+
+# Production Server
+gunicorn==21.2.0
+
+# Optional: PostgreSQL support (recommended for production)
+# Uncomment if using PostgreSQL
+# psycopg2-binary==2.9.9
+
+# Optional: MySQL support
+# Uncomment if using MySQL
+# pymysql==1.1.0
