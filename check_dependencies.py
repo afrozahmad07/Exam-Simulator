@@ -10,7 +10,7 @@ print(f"Python executable: {sys.executable}")
 print("\n" + "="*60)
 
 dependencies = [
-    ('Flask', 'Flask'),
+    ('Flask', 'flask'),
     ('SQLAlchemy', 'sqlalchemy'),
     ('Flask-Login', 'flask_login'),
     ('openai', 'openai'),
