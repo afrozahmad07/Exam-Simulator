@@ -134,6 +134,55 @@ ssh root@examsimulator.afrozahmad.com '/home/examsimulator/deploy-with-migration
 
 ---
 
+## Bug Fix Migrations (October 2025)
+
+⚠️ **IMPORTANT:** Apply these one-time migrations to fix critical bugs identified during testing.
+
+See `BUG_FIXES_SUMMARY.md` and `QUICK_FIX_GUIDE.md` for detailed information.
+
+### Apply Bug Fixes
+
+**Development (Laptop):**
+```bash
+cd ~/Exam-Simulator
+source venv/bin/activate
+
+# Backup first
+cp exam_simulator.db exam_simulator.db.backup
+
+# Run migrations (select option 1 for SQLite)
+python3 migrate_user_answer_column.py
+python3 migrate_url_path_constraint.py
+
+# Restart app
+flask run
+```
+
+**Production (Server):**
+```bash
+ssh root@examsimulator.afrozahmad.com
+cd /home/examsimulator/Exam-Simulator
+source venv/bin/activate
+
+# Backup first
+mysqldump -u exam_user -p exam_simulator > backup_$(date +%Y%m%d).sql
+
+# Run migrations (select option 2 for MariaDB)
+python3 migrate_user_answer_column.py
+python3 migrate_url_path_constraint.py
+
+# Restart app
+systemctl restart exam-simulator
+```
+
+**What These Fix:**
+- SuperAdmins can now generate questions from all org documents
+- Short answer responses no longer truncated at 10 characters
+- Multiple organizations can have empty URL paths
+- Clearer error messages for URL validation
+
+---
+
 ## Advanced: Syncing Data Between Environments
 
 ⚠️ **WARNING:** Only do this if you need to copy development data to production!

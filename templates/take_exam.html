@@ -362,6 +362,7 @@
 
     // Timer functionality
     let timerInterval;
+    let isSubmitting = false; // Flag to prevent multiple submissions
 
     function updateTimer() {
         const now = new Date();
@@ -386,17 +387,57 @@
             timerElement.classList.remove('text-primary', 'text-warning');
         }
 
-        // Auto-submit when time is up
-        if (remainingSeconds === 0) {
+        // Auto-submit when time is up (only once)
+        if (remainingSeconds === 0 && !isSubmitting) {
+            isSubmitting = true;
             clearInterval(timerInterval);
-            alert('Time is up! Your exam will be submitted automatically.');
-            document.querySelector('form[action="{{ url_for('submit_exam') }}"]').submit();
+
+            // Show modal instead of alert
+            const confirmSubmit = confirm('Time is up! Your exam will be submitted automatically.');
+            if (confirmSubmit !== false) { // Submit even if they don't click anything
+                // Disable all form inputs to prevent changes during submission
+                document.querySelectorAll('input, textarea, button').forEach(el => {
+                    el.disabled = true;
+                });
+
+                // Show loading state
+                document.body.style.cursor = 'wait';
+
+                // Submit the form
+                document.querySelector('form[action="{{ url_for('submit_exam') }}"]').submit();
+            }
         }
     }
 
-    // Start timer
-    timerInterval = setInterval(updateTimer, 1000);
-    updateTimer();
+    // Check if time has already expired on page load (e.g., after error redirect)
+    function checkInitialTimeExpired() {
+        const now = new Date();
+        const elapsed = Math.floor((now - startTime) / 1000);
+        const totalSeconds = duration * 60;
+        const remainingSeconds = Math.max(0, totalSeconds - elapsed);
+
+        // If time already expired when page loaded, don't start timer, just submit
+        if (remainingSeconds === 0 && !isSubmitting) {
+            isSubmitting = true;
+            alert('Your exam time has expired. Submitting now...');
+
+            // Disable all form inputs
+            document.querySelectorAll('input, textarea, button').forEach(el => {
+                el.disabled = true;
+            });
+
+            // Submit immediately
+            document.querySelector('form[action="{{ url_for('submit_exam') }}"]').submit();
+            return true;
+        }
+        return false;
+    }
+
+    // Start timer only if time hasn't expired
+    if (!checkInitialTimeExpired()) {
+        timerInterval = setInterval(updateTimer, 1000);
+        updateTimer();
+    }
 
     // Question navigation
     function navigateQuestion(direction) {

@@ -135,7 +135,7 @@ class ExamQuestion(Base):
     id = Column(Integer, primary_key=True)
     exam_id = Column(Integer, ForeignKey('exams.id'), nullable=False)
     question_id = Column(Integer, ForeignKey('questions.id'), nullable=False)
-    user_answer = Column(String(10), nullable=True)  # A, B, C, D or null if not answered
+    user_answer = Column(Text, nullable=True)  # A, B, C, D for MCQ/T/F, or full text for short answer
     is_correct = Column(Boolean, nullable=True)  # True/False or null if not answered
     time_spent = Column(Integer, nullable=True)  # Time spent in seconds
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -164,7 +164,7 @@ class OrganizationSettings(Base):
     organization_name = Column(String(255), unique=True, nullable=False, index=True)
     display_name = Column(String(255), nullable=False)  # Display name for branding
     subdomain = Column(String(100), unique=True, nullable=True, index=True)  # Optional subdomain
-    url_path = Column(String(100), unique=True, nullable=True, index=True)  # Optional URL path like /org-name
+    url_path = Column(String(100), nullable=True, index=True)  # Optional URL path like /org-name (unique constraint handled at app level)
 
     # Branding
     logo_filename = Column(String(255), nullable=True)  # Uploaded logo file

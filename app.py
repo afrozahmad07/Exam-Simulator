@@ -493,8 +493,11 @@ def generate_questions(document_id):
             flash('Document not found', 'error')
             return redirect(url_for('documents'))
 
-        # Check if user owns this document
-        if document.uploaded_by != current_user.id:
+        # Check if user owns this document or is a superadmin/admin with org access
+        is_superadmin = current_user.is_superadmin()
+        is_org_admin = current_user.is_org_admin() and current_user.organization == document.organization
+
+        if not (document.uploaded_by == current_user.id or is_superadmin or is_org_admin):
             flash('You do not have permission to access this document', 'error')
             return redirect(url_for('documents'))
 
@@ -999,7 +1002,21 @@ def start_exam():
             session.pop('exam_start_time', None)
             session.pop('exam_duration', None)
             session.pop('question_times', None)
+            session.pop('submission_failed', None)
+            session.pop('submission_error', None)
             return redirect(url_for('exam_results', exam_id=exam.id))
+
+        # Check if submission has failed previously (infinite loop prevention)
+        if session.get('submission_failed'):
+            submission_error = session.get('submission_error', 'Unknown error')
+            session.pop('submission_failed', None)
+            session.pop('submission_error', None)
+
+            # Show helpful error message
+            if 'Data too long' in submission_error or '1406' in submission_error:
+                flash('Database migration required: Your answer is too long. Please contact support to run: python3 migrate_user_answer_column.py', 'error')
+            else:
+                flash(f'Previous submission failed: {submission_error}. Please try again or contact support.', 'error')
 
         # Get questions for the exam
         question_ids = session.get('exam_questions', [])
@@ -1152,7 +1169,51 @@ def submit_exam():
 
     except Exception as e:
         db_session.rollback()
-        flash(f'Error submitting exam: {str(e)}', 'error')
+
+        # Check if this is a database schema error (data too long, etc.)
+        error_msg = str(e)
+        if 'Data too long' in error_msg or '1406' in error_msg:
+            flash('Database error: Please contact support. Your answers may be too long for the database schema. Run database migrations to fix this issue.', 'error')
+        elif 'IntegrityError' in error_msg or 'Duplicate entry' in error_msg:
+            flash('Database integrity error: Please contact support to resolve database constraint issues.', 'error')
+        else:
+            flash(f'Error submitting exam: {error_msg}', 'error')
+
+        # Store submission attempt flag to prevent infinite loops
+        session['submission_failed'] = True
+        session['submission_error'] = error_msg
+
+        # If time has expired and submission is failing, mark exam as completed anyway
+        # to prevent infinite loop, but with a note
+        try:
+            exam = db_session.query(Exam).get(exam_id)
+            if exam and not exam.is_completed():
+                # Check if time has truly expired
+                start_time_dt = datetime.fromisoformat(session.get('exam_start_time'))
+                exam_duration = session.get('exam_duration', 30)
+                time_elapsed = (datetime.utcnow() - start_time_dt).total_seconds() / 60
+
+                if time_elapsed >= exam_duration:
+                    # Time expired - mark as completed with error state
+                    exam.completed_at = datetime.utcnow()
+                    exam.score = 0.0  # Mark as 0 due to submission error
+                    db_session.commit()
+
+                    # Clear session to prevent reloading
+                    session.pop('exam_id', None)
+                    session.pop('exam_questions', None)
+                    session.pop('exam_document_id', None)
+                    session.pop('exam_start_time', None)
+                    session.pop('exam_duration', None)
+                    session.pop('exam_answers', None)
+                    session.pop('question_times', None)
+                    session.pop('question_start_time', None)
+
+                    flash('Your exam time has expired. Due to a technical error, your answers could not be saved. Please contact support.', 'warning')
+                    return redirect(url_for('exam'))
+        except:
+            pass  # If this fails, fall through to normal error handling
+
         return redirect(url_for('start_exam'))
     finally:
         db_session.close()
@@ -1910,7 +1971,20 @@ def organization_settings():
             # Update basic settings
             org_settings.display_name = request.form.get('display_name', org_settings.display_name)
             org_settings.subdomain = request.form.get('subdomain') or None
-            org_settings.url_path = request.form.get('url_path') or None
+
+            # Validate url_path uniqueness (only when not empty)
+            new_url_path = request.form.get('url_path') or None
+            if new_url_path and new_url_path != org_settings.url_path:
+                # Check if url_path is already in use by another organization
+                existing_url_path = db_session.query(OrganizationSettings)\
+                    .filter(OrganizationSettings.url_path == new_url_path)\
+                    .filter(OrganizationSettings.id != org_settings.id)\
+                    .first()
+                if existing_url_path:
+                    flash(f'URL path "{new_url_path}" is already in use by another organization', 'error')
+                    return redirect(url_for('organization_settings', org=target_org) if is_superadmin else url_for('organization_settings'))
+
+            org_settings.url_path = new_url_path
 
             # Update colors
             org_settings.primary_color = request.form.get('primary_color', org_settings.primary_color)
@@ -1929,7 +2003,17 @@ def organization_settings():
 
             # Update contact info
             org_settings.contact_email = request.form.get('contact_email') or None
-            org_settings.support_url = request.form.get('support_url') or None
+
+            # Validate and update support URL
+            support_url = request.form.get('support_url', '').strip()
+            if support_url:
+                # Check if URL has a valid format
+                if not (support_url.startswith('http://') or support_url.startswith('https://')):
+                    flash('Support URL must start with http:// or https:// (e.g., https://support.yourorg.com)', 'error')
+                    return redirect(url_for('organization_settings', org=target_org) if is_superadmin else url_for('organization_settings'))
+                org_settings.support_url = support_url
+            else:
+                org_settings.support_url = None
 
             # Handle logo upload
             if 'logo' in request.files:
