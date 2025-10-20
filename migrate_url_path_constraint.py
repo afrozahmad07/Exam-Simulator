@@ -229,6 +229,23 @@ def migrate_mariadb(host='localhost', port=3306, user='exam_user', password=None
 
 
 if __name__ == '__main__':
+    import os
+
+    # Check for auto mode (non-interactive) via environment variable
+    auto_mode = os.getenv('AUTO_MIGRATE', 'false').lower() == 'true'
+
+    if auto_mode:
+        # Auto mode for deployment scripts - use MariaDB with defaults
+        print("Running in auto mode (MariaDB with default configuration)...")
+        success = migrate_mariadb(
+            host='localhost',
+            port=3306,
+            user='exam_user',
+            database='exam_simulator'
+        )
+        sys.exit(0 if success else 1)
+
+    # Interactive mode
     print("=" * 60)
     print("Database Migration: Remove url_path Unique Constraint")
     print("=" * 60)
