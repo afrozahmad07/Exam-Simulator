@@ -11,9 +11,8 @@ google-generativeai==0.3.1
 # Database drivers
 pymysql>=1.1.0
 
-# PDF Generation
-xhtml2pdf==0.2.13
+# PDF Generation (compatible versions)
+reportlab==3.6.13
+xhtml2pdf==0.2.15
 Pillow>=10.0.0
 html5lib>=1.1
-reportlab>=3.6.0
-PyPDF2>=3.0.0
