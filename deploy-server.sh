@@ -67,6 +67,24 @@ python migrate_db.py || {
     exit 1
 }
 
+# Step 4.5: Run bug fix migrations (one-time migrations for specific bugs)
+print_status "Running bug fix migrations (if needed)..."
+
+# Check if migrations have been applied by looking for marker files
+if [ ! -f ".migration_user_answer_done" ]; then
+    print_status "Applying user_answer column migration..."
+    echo "2" | python3 migrate_user_answer_column.py && touch .migration_user_answer_done || print_warning "User answer migration failed or already applied"
+else
+    print_status "User answer migration already applied (skipping)"
+fi
+
+if [ ! -f ".migration_url_path_done" ]; then
+    print_status "Applying url_path constraint migration..."
+    echo "2" | python3 migrate_url_path_constraint.py && touch .migration_url_path_done || print_warning "URL path migration failed or already applied"
+else
+    print_status "URL path migration already applied (skipping)"
+fi
+
 # Step 5: Restart the application service
 print_status "Restarting application service..."
 systemctl restart ${SERVICE_NAME} || {
