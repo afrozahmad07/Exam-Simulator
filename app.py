@@ -1086,7 +1086,7 @@ def exam():
             session['exam_questions'] = [q.id for q in selected_questions]
             session['exam_document_id'] = int(document_id)
             session['exam_start_time'] = datetime.utcnow().isoformat()
-            session['exam_duration'] = duration  # User-selected duration
+            session['exam_duration'] = int(duration)  # User-selected duration (ensure integer)
             session['exam_answers'] = {}  # Store user answers
             session['question_times'] = {}  # Track time per question
             session['question_start_time'] = None  # Track current question start time
@@ -1153,7 +1153,7 @@ def start_exam():
 
         # Get exam metadata
         start_time = session.get('exam_start_time')
-        duration = session.get('exam_duration', 30)
+        duration = int(session.get('exam_duration', 30))  # Ensure duration is an integer
         user_answers = session.get('exam_answers', {})
         question_times = session.get('question_times', {})
 

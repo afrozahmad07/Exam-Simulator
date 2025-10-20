@@ -117,7 +117,7 @@
                             <div class="mb-1 small text-muted">Time Remaining</div>
                             <div id="timer" class="fs-4 fw-bold text-primary">
                                 <i class="bi bi-clock me-2"></i>
-                                <span id="timer-display">{{ duration }}:00</span>
+                                <span id="timer-display">{{ '%02d' % duration }}:00</span>
                             </div>
                         </div>
                     </div>
@@ -343,12 +343,20 @@
 <script>
     // Exam configuration
     const startTime = new Date("{{ start_time }}");
-    const duration = {{ duration }}; // in minutes
+    const duration = parseInt({{ duration }}); // in minutes - ensure it's an integer
     const totalQuestions = {{ total_questions }};
     let currentQuestion = 1;
     let answeredQuestions = new Set();
     let questionStartTimes = {}; // Track when each question was first viewed
     let questionTotalTimes = {}; // Track total time spent on each question
+
+    // Debug log to verify values
+    console.log('Exam Timer Configuration:', {
+        startTime: startTime,
+        duration: duration,
+        durationInSeconds: duration * 60,
+        totalQuestions: totalQuestions
+    });
 
     // Initialize answered questions and times from server
     {% for qid, answer in user_answers.items() %}
@@ -375,6 +383,20 @@
 
         const timerDisplay = document.getElementById('timer-display');
         const timerElement = document.getElementById('timer');
+
+        // Ensure we're displaying numbers, not NaN
+        if (isNaN(minutes) || isNaN(seconds)) {
+            console.error('Timer calculation error:', {
+                now: now,
+                startTime: startTime,
+                elapsed: elapsed,
+                duration: duration,
+                totalSeconds: totalSeconds,
+                remainingSeconds: remainingSeconds
+            });
+            timerDisplay.textContent = '00:00';
+            return;
+        }
 
         timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 
