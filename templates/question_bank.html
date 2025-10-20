@@ -6,12 +6,25 @@
 <div class="container">
     <!-- Header -->
     <div class="row mb-4">
-        <div class="col-md-12">
+        <div class="col-md-8">
             <h1 class="h2 mb-3">
                 <i class="bi bi-bank me-2 text-primary"></i>Question Bank
             </h1>
-            <p class="text-muted">Manage all your approved questions</p>
+            <p class="text-muted">Browse, manage, and practice with all your approved questions</p>
         </div>
+        <div class="col-md-4 text-end">
+            <a href="{{ url_for('exam') }}" class="btn btn-success btn-lg">
+                <i class="bi bi-play-circle me-2"></i>
+                Take Practice Exam
+            </a>
+        </div>
+    </div>
+
+    <!-- Info Alert -->
+    <div class="alert alert-info mb-4">
+        <i class="bi bi-lightbulb me-2"></i>
+        <strong>How it works:</strong> Questions shown here are automatically generated from your documents.
+        You can review them here, then click "Take Practice Exam" to test yourself with these questions.
     </div>
 
     <!-- Statistics Cards -->

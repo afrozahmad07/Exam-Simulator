@@ -1011,11 +1011,19 @@ def exam():
                 flash('You have an exam in progress. Continue where you left off.', 'info')
                 return redirect(url_for('start_exam'))
 
-        # Get user's documents
-        user_documents = db_session.query(Document)\
-            .filter_by(uploaded_by=current_user.id)\
-            .order_by(Document.created_at.desc())\
-            .all()
+        # Get documents - show organization documents if user has organization, otherwise just their own
+        if current_user.organization:
+            # Show all documents from the user's organization
+            user_documents = db_session.query(Document)\
+                .filter_by(organization=current_user.organization)\
+                .order_by(Document.created_at.desc())\
+                .all()
+        else:
+            # Show only user's own documents
+            user_documents = db_session.query(Document)\
+                .filter_by(uploaded_by=current_user.id)\
+                .order_by(Document.created_at.desc())\
+                .all()
 
         # Count questions for each document
         for doc in user_documents:
@@ -1027,6 +1035,7 @@ def exam():
             document_id = request.form.get('document_id')
             num_questions = request.form.get('num_questions', 10, type=int)
             difficulty = request.form.get('difficulty', 'all')
+            duration = request.form.get('duration', 30, type=int)  # Get user-selected duration
 
             if not document_id:
                 flash('Please select a document', 'error')
@@ -1070,7 +1079,7 @@ def exam():
             session['exam_questions'] = [q.id for q in selected_questions]
             session['exam_document_id'] = int(document_id)
             session['exam_start_time'] = datetime.utcnow().isoformat()
-            session['exam_duration'] = 30  # 30 minutes default
+            session['exam_duration'] = duration  # User-selected duration
             session['exam_answers'] = {}  # Store user answers
             session['question_times'] = {}  # Track time per question
             session['question_start_time'] = None  # Track current question start time
