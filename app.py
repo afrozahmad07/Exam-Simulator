@@ -933,21 +933,28 @@ def question_bank():
                 uploaded_by=current_user.id
             ).all()
 
-        # Count by type
+        # Count by type - match the same logic as main query (organization-wide or user-only)
+        if current_user.organization:
+            # Count all questions from organization
+            base_filter = (Document.organization == current_user.organization,)
+        else:
+            # Count only user's questions
+            base_filter = (Document.uploaded_by == current_user.id,)
+
         total_mcq = db_session.query(Question).join(Document).filter(
-            Document.uploaded_by == current_user.id,
+            *base_filter,
             Question.question_type == 'mcq',
             Question.status == 'approved'
         ).count()
 
         total_tf = db_session.query(Question).join(Document).filter(
-            Document.uploaded_by == current_user.id,
+            *base_filter,
             Question.question_type == 'true_false',
             Question.status == 'approved'
         ).count()
 
         total_sa = db_session.query(Question).join(Document).filter(
-            Document.uploaded_by == current_user.id,
+            *base_filter,
             Question.question_type == 'short_answer',
             Question.status == 'approved'
         ).count()
