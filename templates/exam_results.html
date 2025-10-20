@@ -306,6 +306,45 @@
                                             {% endif %}
                                         </div>
                                     </div>
+                                {% elif eq.question.question_type == 'short_answer' %}
+                                    <!-- Short Answer Display -->
+                                    <div class="mb-3">
+                                        <!-- User's Answer -->
+                                        <div class="p-3 mb-3 rounded bg-light border">
+                                            <strong><i class="bi bi-pencil-square me-2"></i>Your Answer:</strong>
+                                            <div class="mt-2" style="white-space: pre-wrap; font-family: inherit;">{{ eq.user_answer if eq.user_answer else '<em class="text-muted">No answer provided</em>' | safe }}</div>
+                                        </div>
+
+                                        <!-- Model Answer -->
+                                        {% if eq.question.model_answer %}
+                                        <div class="p-3 mb-3 rounded bg-success bg-opacity-10 border border-success">
+                                            <strong><i class="bi bi-check-circle text-success me-2"></i>Model Answer:</strong>
+                                            <div class="mt-2" style="white-space: pre-wrap;">{{ eq.question.model_answer }}</div>
+                                        </div>
+                                        {% endif %}
+
+                                        <!-- Key Points -->
+                                        {% if eq.question.key_points %}
+                                        <div class="p-3 rounded bg-info bg-opacity-10 border border-info">
+                                            <strong><i class="bi bi-list-check text-info me-2"></i>Key Points to Cover:</strong>
+                                            <ul class="mt-2 mb-0">
+                                                {% for point in eq.question.key_points %}
+                                                <li>{{ point }}</li>
+                                                {% endfor %}
+                                            </ul>
+                                        </div>
+                                        {% endif %}
+
+                                        <!-- Grading Note -->
+                                        <div class="alert alert-warning mt-3 mb-0">
+                                            <i class="bi bi-exclamation-triangle me-2"></i>
+                                            <strong>Note:</strong> Short answer questions require manual grading by your instructor.
+                                            Compare your answer with the model answer and key points above.
+                                            {% if not eq.is_correct %}
+                                            <span class="text-danger"><br>This question was not automatically marked as correct.</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
                                 {% endif %}
 
                                 {% if eq.question.explanation %}

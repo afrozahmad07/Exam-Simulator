@@ -75,6 +75,111 @@ def allowed_file(filename):
            filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
 
 
+def grade_short_answer(user_answer, model_answer, key_points, provider='gemini', api_key=None):
+    """
+    Grade a short answer using AI semantic comparison
+
+    Args:
+        user_answer: Student's answer text
+        model_answer: Correct answer text
+        key_points: List of key points that should be covered
+        provider: AI provider ('openai' or 'gemini')
+        api_key: API key for the provider
+
+    Returns:
+        tuple: (is_correct: bool, similarity_score: float, feedback: str)
+    """
+    if not user_answer or not user_answer.strip():
+        return False, 0.0, "No answer provided"
+
+    # Construct grading prompt
+    prompt = f"""You are an exam grader. Grade the following short answer question.
+
+Model Answer: {model_answer}
+
+Key Points to Cover:
+{chr(10).join(f'- {point}' for point in key_points) if key_points else 'N/A'}
+
+Student's Answer: {user_answer}
+
+Evaluate the student's answer based on:
+1. Semantic similarity to the model answer
+2. Coverage of key points
+3. Accuracy of information
+4. Completeness
+
+Provide your response in this exact format:
+SCORE: [0-100]
+PASS: [YES/NO]
+FEEDBACK: [Brief feedback about what was good or missing]"""
+
+    try:
+        if provider == 'gemini':
+            import google.generativeai as genai
+            if api_key:
+                genai.configure(api_key=api_key)
+            model = genai.GenerativeModel('gemini-2.0-flash-exp')
+            response = model.generate_content(prompt)
+            result_text = response.text
+        else:  # openai
+            if api_key:
+                client = openai.OpenAI(api_key=api_key)
+            else:
+                client = openai.OpenAI()
+
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.3
+            )
+            result_text = response.choices[0].message.content
+
+        # Parse response
+        lines = result_text.strip().split('\n')
+        score = 0
+        is_correct = False
+        feedback = "Graded by AI"
+
+        for line in lines:
+            if line.startswith('SCORE:'):
+                score = float(line.split(':')[1].strip())
+            elif line.startswith('PASS:'):
+                is_correct = 'YES' in line.upper()
+            elif line.startswith('FEEDBACK:'):
+                feedback = line.split(':', 1)[1].strip()
+
+        # If score >= 60%, consider it correct
+        if score >= 60:
+            is_correct = True
+
+        return is_correct, score, feedback
+
+    except Exception as e:
+        # Fallback: simple keyword matching
+        user_lower = user_answer.lower()
+        model_lower = model_answer.lower() if model_answer else ""
+
+        # Count how many key points are mentioned
+        if key_points:
+            points_covered = sum(1 for point in key_points if point.lower() in user_lower)
+            coverage = (points_covered / len(key_points)) * 100
+
+            if coverage >= 50:
+                return True, coverage, f"Covered {points_covered}/{len(key_points)} key points"
+            else:
+                return False, coverage, f"Only covered {points_covered}/{len(key_points)} key points"
+
+        # Simple word overlap if no key points
+        model_words = set(model_lower.split())
+        user_words = set(user_lower.split())
+        overlap = len(model_words & user_words) / len(model_words) if model_words else 0
+
+        if overlap >= 0.3:
+            return True, overlap * 100, "Partial match with model answer"
+        else:
+            return False, overlap * 100, "Low similarity to model answer"
+
+
 # Custom decorators for role-based access control
 def role_required(*roles):
     """
@@ -1124,7 +1229,31 @@ def submit_exam():
             if user_answer:
                 if question.question_type == 'true_false':
                     is_correct = user_answer.lower() == question.correct_answer.lower()
-                else:
+                elif question.question_type == 'short_answer':
+                    # Use AI-based grading for short answers
+                    try:
+                        # Get organization's API key if available
+                        org_api_key = None
+                        provider = current_user.ai_provider or 'gemini'
+
+                        if current_user.organization:
+                            org_settings = db_session.query(OrganizationSettings)\
+                                .filter_by(organization_name=current_user.organization)\
+                                .first()
+                            if org_settings:
+                                org_api_key = org_settings.gemini_api_key if provider == 'gemini' else org_settings.openai_api_key
+
+                        is_correct, score, feedback = grade_short_answer(
+                            user_answer=user_answer,
+                            model_answer=question.model_answer,
+                            key_points=question.key_points,
+                            provider=provider,
+                            api_key=org_api_key
+                        )
+                    except Exception as e:
+                        # Fallback to marking as incorrect if AI grading fails
+                        is_correct = False
+                else:  # MCQ
                     is_correct = user_answer == question.correct_answer
             else:
                 unanswered_count += 1
