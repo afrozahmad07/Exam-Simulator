@@ -6,5 +6,14 @@ PyPDF2==3.0.1
 python-docx==1.1.0
 python-dotenv==1.0.0
 Werkzeug==3.0.1
-xhtml2pdf==0.2.13
 google-generativeai==0.3.1
+
+# Database drivers
+pymysql>=1.1.0
+
+# PDF Generation
+xhtml2pdf==0.2.13
+Pillow>=10.0.0
+html5lib>=1.1
+reportlab>=3.6.0
+PyPDF2>=3.0.0
